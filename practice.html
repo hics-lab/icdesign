@@ -2714,8 +2714,8 @@ function addView(tab, kind, isDuplicate) {
   const filterInput = document.createElement('input');
   filterInput.type = 'text';
   filterInput.className = 'var-filter';
-  filterInput.placeholder = '🔍 신호 필터';
-  filterInput.title = '신호명 일부를 입력하면 해당 곡선만 표시 (예: out, @2k). 비우면 전체.';
+  filterInput.placeholder = '🔍 필터 (공백=OR)';
+  filterInput.title = '신호명 일부 입력 시 해당 곡선만 표시. 공백으로 여러 단어를 넣으면 OR 검색 (예: "out @2k" → out 또는 @2k 포함). 비우면 전체.';
   filterInput.style.display = 'none';
   filterInput.addEventListener('input', () => applyVarFilter(view));
   left.appendChild(filterInput);
@@ -2915,8 +2915,7 @@ function buildViewVarList(tab, view, listEl) {
     cb.dataset.idx = String(k);
     cb.addEventListener('change', () => {
       varSelections[tab][name] = cb.checked;
-      const q = _varFilterQ(view);
-      const match = !q || name.toLowerCase().includes(q);
+      const match = _varNameMatches(_varFilterQ(view), name);
       toggleViewVar(view, k, cb.checked && match);
       saveToLocalStorage();
     });
@@ -2946,13 +2945,22 @@ function _varFilterQ(view) {
   return ((view.filterInput && view.filterInput.value) || '').trim().toLowerCase();
 }
 
+// 공백으로 구분된 여러 단어 중 하나라도 포함하면 매칭 (OR 검색). 비우면 전체 매칭.
+function _varNameMatches(q, name) {
+  if (!q) return true;
+  const terms = q.split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const lname = name.toLowerCase();
+  return terms.some(t => lname.includes(t));
+}
+
 // 신호 필터 적용 — 이름이 매칭되는 행만 목록에 표시하고, 매칭+체크된 곡선만 차트에 표시
 function applyVarFilter(view) {
   if (!view.element) return;
   const q = _varFilterQ(view);
   view.element.querySelectorAll('.var-list label').forEach(lbl => {
     const name = lbl.dataset.vname || '';
-    const match = !q || name.toLowerCase().includes(q);
+    const match = _varNameMatches(q, name);
     lbl.style.display = match ? '' : 'none';
     const k = parseInt(lbl.dataset.vidx, 10);
     const cb = lbl.querySelector('input[type="checkbox"]');
