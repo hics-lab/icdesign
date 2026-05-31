@@ -61,7 +61,7 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 .resizer-v:hover::before,.resizer-v.dragging::before{background:#fff;}
 
 /* LEFT */
-.left{display:grid;grid-template-rows:auto 1fr auto auto;gap:6px;padding:10px;}
+.left{display:grid;grid-template-rows:auto 1fr auto auto auto;gap:6px;padding:10px;}
 .resizer-h{height:7px;cursor:row-resize;background:#dfe6e9;border-radius:3px;position:relative;flex-shrink:0;transition:background .15s;}
 .resizer-h:hover,.resizer-h.dragging{background:var(--secondary);}
 .resizer-h::before{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:2px;background:#95a5a6;border-radius:1px;}
@@ -178,20 +178,18 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 .param-row button.apply:hover{background:var(--secondary);color:#fff;}
 .param-row .hint{color:var(--muted);font-size:10px;font-style:italic;}
 
-/* PARAMETER SWEEP bar (under tab-toolbar) */
-.sweep-bar{padding:0 12px 8px;background:#fafbfd;border-bottom:1px solid var(--border);}
-.sweep-toggle{padding:3px 10px;border:1px solid var(--border);background:#fff;color:#8e44ad;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;}
-.sweep-toggle:hover{background:#f3eaf8;}
-.sweep-toggle.open{background:#8e44ad;color:#fff;border-color:#8e44ad;}
-.sweep-fields{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#faf5fd;border:1px solid #e0cdee;border-radius:5px;padding:6px 10px;margin-top:6px;font-size:11.5px;}
-.sweep-fields label{display:flex;align-items:center;gap:4px;color:#555;font-size:11px;}
-.sweep-fields input{padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-family:'Consolas',monospace;font-size:11px;color:var(--text);}
-.sweep-fields input:focus{outline:none;border-color:#8e44ad;box-shadow:0 0 0 2px rgba(142,68,173,.15);}
-.sweep-fields select{padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:11px;background:#fff;max-width:140px;}
-.sweep-fields .btn-sweep{padding:4px 12px;border:none;background:#8e44ad;color:#fff;border-radius:4px;cursor:pointer;font-size:11.5px;font-weight:600;margin-left:auto;}
-.sweep-fields .btn-sweep:hover{background:#7d3c9d;}
-.sweep-fields .btn-sweep:disabled{background:#c9b3d6;cursor:default;}
-.sweep-fields .hint{color:var(--muted);font-size:10px;font-style:italic;flex-basis:100%;}
+/* PARAMETER SWEEP bar — compact single row above the log (left pane) */
+.sweep-bar{display:flex;align-items:center;gap:5px;padding:3px 6px;background:#faf5fd;border:1px solid #e0cdee;border-radius:5px;font-size:11px;}
+.sweep-bar .sweep-lbl{color:#8e44ad;font-weight:700;white-space:nowrap;}
+.sweep-bar select,.sweep-bar input{padding:1px 5px;height:22px;border:1px solid #ccc;border-radius:3px;font-family:'Consolas',monospace;font-size:10.5px;color:var(--text);box-sizing:border-box;min-width:0;}
+.sweep-bar select{max-width:96px;background:#fff;}
+.sweep-bar #sw-param{width:66px;}
+.sweep-bar #sw-values{flex:1;min-width:90px;}
+.sweep-bar #sw-out{width:66px;}
+.sweep-bar input:focus,.sweep-bar select:focus{outline:none;border-color:#8e44ad;box-shadow:0 0 0 2px rgba(142,68,173,.15);}
+.sweep-bar .btn-sweep{padding:1px 9px;height:22px;border:none;background:#8e44ad;color:#fff;border-radius:3px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;}
+.sweep-bar .btn-sweep:hover{background:#7d3c9d;}
+.sweep-bar .btn-sweep:disabled{background:#c9b3d6;cursor:default;}
 
 /* VAR SELECTOR (per tab, populated after Run) */
 .var-selector{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#fff;border:1px dashed var(--border);border-radius:5px;padding:6px 10px;margin-bottom:8px;font-size:11.5px;flex-shrink:0;}
@@ -300,6 +298,15 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 
     <div class="resizer-h" id="splitter-h" title="드래그해서 에디터/로그 높이 조절"></div>
 
+    <div class="sweep-bar" id="sweep-bar" title="한 소자를 여러 값으로 바꿔가며 현재 결과 탭(.tran/.dc/.ac)의 곡선을 겹쳐 그립니다. 소자 목록은 현재 netlist 기준.">
+      <span class="sweep-lbl">⟲ Sweep</span>
+      <select id="sw-dev" onfocus="populateSweepDevices()" title="현재 netlist 의 소자"><option value="">소자</option></select>
+      <input id="sw-param" placeholder="파라미터" title="R/C/V/I 는 비움. MOSFET 은 W / L 등">
+      <input id="sw-values" placeholder="값들: 1k, 2k, 5k">
+      <input id="sw-out" placeholder="출력" title="플롯할 신호 (예: v(out), i(Vds)). 비우면 전체 변수">
+      <button class="btn-sweep" id="btn-run-sweep" onclick="runSweep()" title="현재 결과 탭의 분석을 값마다 반복 실행">▶ <span id="sweep-kind">.tran</span></button>
+    </div>
+
     <div class="log-wrap" id="log-wrap">
       <div class="log-head">
         <span>📜 ngspice 로그</span>
@@ -325,18 +332,6 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
       <button id="btn-run" class="btn btn-pri" onclick="runActiveTab()" title="현재 탭 실행 (F5 / Ctrl+Enter)">▶ Run <span id="run-kind">.tran</span><span class="kbd">F5</span></button>
       <button id="btn-stop" class="btn btn-warn" onclick="stopSim()" disabled title="실행 중지 (Esc)">■ Stop<span class="kbd">Esc</span></button>
       <span id="status" class="status">idle</span>
-    </div>
-
-    <div class="sweep-bar">
-      <button class="sweep-toggle" id="sweep-toggle" onclick="toggleSweep()" title="한 소자/파라미터를 여러 값으로 바꿔가며 곡선을 겹쳐 그립니다 (.tran/.dc/.ac)">⟲ 파라미터 Sweep</button>
-      <div class="sweep-fields" id="sweep-fields" hidden>
-        <label>소자 <select id="sw-dev"><option value="">(소자 선택)</option></select></label>
-        <label>파라미터 <input id="sw-param" placeholder="R/C/V는 비움" style="width:90px"></label>
-        <label>값들 <input id="sw-values" placeholder="1k, 2k, 5k, 10k" style="width:150px"></label>
-        <label>출력 <input id="sw-out" placeholder="비우면 전체" style="width:90px"></label>
-        <button class="btn-sweep" id="btn-run-sweep" onclick="runSweep()">▶ Sweep <span id="sweep-kind">.tran</span></button>
-        <span class="hint">예) 소자 <code>R1</code>, 파라미터 비움, 값들 <code>1k, 2k, 5k</code> → R1을 세 값으로 바꿔 현재 탭 분석을 겹쳐 그림. MOSFET은 파라미터 <code>W</code> 등 지정.</span>
-      </div>
     </div>
 
     <div class="tab-area">
@@ -1687,6 +1682,7 @@ function refreshDetected() {
   document.getElementById('detected-summary').textContent = list.length
     ? '검출됨: ' + list.join(', ')
     : '검출된 해석 없음';
+  populateSweepDevices();  // sweep 소자 목록을 현재(활성) netlist 기준으로 항상 동기화
 }
 
 /* ── 파라미터 입력 ↔ netlist 동기화 ── */
@@ -2154,18 +2150,6 @@ self.onmessage = function(e) {
    (cross-plot 벡터 참조 불가 + 같은 파일 wrdata 덮어쓰기 때문에 파일 분리 방식)
 ═══════════════════════════════════════════════════════════════════════ */
 const SWEEP_MAX = 16;
-let sweepOpen = false;
-
-function toggleSweep() {
-  sweepOpen = !sweepOpen;
-  document.getElementById('sweep-fields').hidden = !sweepOpen;
-  document.getElementById('sweep-toggle').classList.toggle('open', sweepOpen);
-  if (sweepOpen) {
-    populateSweepDevices();
-    const swk = document.getElementById('sweep-kind');
-    if (swk) swk.textContent = KIND_LABEL[activeTab];
-  }
-}
 
 // netlist 최상위(.subckt 밖) 소자 인스턴스 이름 추출
 function detectDevices(src) {
