@@ -75,6 +75,7 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 .nl-tab:hover:not(.active){background:#dde6ed;}
 .nl-tab.active{background:#fff;border-bottom:1px solid #fff;margin-bottom:-1px;font-weight:600;color:var(--primary);position:relative;z-index:1;}
 .nl-tab .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+.nl-tab .ttl-edit{font-family:inherit;font-size:inherit;font-weight:inherit;color:inherit;background:#fff;border:1px solid var(--secondary);border-radius:3px;padding:0 4px;outline:none;max-width:140px;min-width:60px;}
 .nl-tab .x{color:var(--muted);padding:0 4px;border-radius:50%;font-size:13px;line-height:1;}
 .nl-tab .x:hover{background:#c0392b;color:#fff;}
 .nl-tab-add{padding:3px 9px;background:none;border:1px dashed var(--border);border-radius:5px 5px 0 0;color:var(--muted);cursor:pointer;font-size:13px;flex-shrink:0;}
@@ -1067,12 +1068,18 @@ function renderNetlistTabs() {
   netlistTabs.forEach((t, i) => {
     const el = document.createElement('div');
     el.className = 'nl-tab' + (i === activeNetTab ? ' active' : '');
-    el.title = t.title;
+    el.title = t.title + ' (더블클릭 시 이름 수정)';
     el.innerHTML = '<span class="ttl"></span><span class="x" title="닫기">×</span>';
-    el.querySelector('.ttl').textContent = t.title;
+    const ttlEl = el.querySelector('.ttl');
+    ttlEl.textContent = t.title;
     el.addEventListener('click', e => {
       if (e.target.classList.contains('x')) { closeNetlistTab(i); return; }
+      if (e.target.classList.contains('ttl-edit')) return;
       switchNetlistTab(i);
+    });
+    ttlEl.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      startTabRename(i, ttlEl);
     });
     bar.appendChild(el);
   });
@@ -1082,6 +1089,40 @@ function renderNetlistTabs() {
   add.title = '새 netlist 탭';
   add.onclick = () => newNetlistTab();
   bar.appendChild(add);
+}
+
+function startTabRename(idx, ttlEl) {
+  const t = netlistTabs[idx];
+  if (!t) return;
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'ttl-edit';
+  inp.value = t.title;
+  inp.maxLength = 40;
+  ttlEl.replaceWith(inp);
+  inp.focus();
+  inp.select();
+  let done = false;
+  const commit = (save) => {
+    if (done) return;
+    done = true;
+    if (save) {
+      const v = inp.value.trim();
+      if (v && v !== t.title) {
+        t.title = v.length > 22 ? v.slice(0, 20) + '…' : v;
+        t.userTitle = true;
+        flushSave();
+      }
+    }
+    renderNetlistTabs();
+  };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+  });
+  inp.addEventListener('blur', () => commit(true));
+  inp.addEventListener('click', e => e.stopPropagation());
+  inp.addEventListener('dblclick', e => e.stopPropagation());
 }
 
 function _saveActiveTabContent() {
@@ -1154,6 +1195,7 @@ function closeNetlistTab(idx) {
 function _updateActiveTabTitle() {
   if (!cm || !netlistTabs[activeNetTab]) return;
   const t = netlistTabs[activeNetTab];
+  if (t.userTitle) return;  // 사용자가 직접 이름을 정한 경우 자동 재명명 안 함
   const newTitle = deriveTabTitle(cm.getValue(), t.id);
   if (newTitle !== t.title) {
     t.title = newTitle;
@@ -1271,7 +1313,7 @@ function serializeState() {
   return {
     version: STATE_VERSION,
     savedAt: new Date().toISOString(),
-    netlistTabs: netlistTabs.map(t => ({id: t.id, title: t.title, content: t.content})),
+    netlistTabs: netlistTabs.map(t => ({id: t.id, title: t.title, content: t.content, userTitle: !!t.userTitle})),
     activeNetTab: activeNetTab,
     nextNetTabId: nextNetTabId,
     activeTab: activeTab,
@@ -1293,7 +1335,7 @@ function applyState(state) {
   // 1. netlist tabs (v2) — fall back to single string (v1)
   if (Array.isArray(state.netlistTabs) && state.netlistTabs.length > 0 && cm) {
     netlistTabs = state.netlistTabs.map(t => ({
-      id: t.id, title: t.title || 'Untitled', content: t.content || ''
+      id: t.id, title: t.title || 'Untitled', content: t.content || '', userTitle: !!t.userTitle
     }));
     activeNetTab = (typeof state.activeNetTab === 'number' && state.activeNetTab < netlistTabs.length)
       ? state.activeNetTab : 0;
