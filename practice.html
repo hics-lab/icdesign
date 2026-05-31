@@ -1814,8 +1814,22 @@ function detectCurplotFailure(log) {
   if (!m) return false;
   const plot = m[1].trim().split(/\s+/)[0] || '';
   // 분석 성공 시 plot 이름: tran1, dc1, ac1, noise1/noise2
-  // 실패 시: constants (ngspice 의 built-in 상수 plot)
-  return /^constants/i.test(plot);
+  // 실패 시: const (ngspice 의 built-in 상수 plot — 짧은 이름은 "const",
+  //          타입 표기는 "constants". echo $curplot 은 "const" 를 출력한다)
+  return /^const/i.test(plot);
+}
+
+// 2차 방어: 파싱된 변수명이 ngspice built-in 상수 plot(const) 의 것이면 실패 처리.
+// curplot 검출이 어떤 이유로 새더라도 이 상수들(boltz/echarge/planck/kelvin 등)은
+// 정상 회로 신호명으로 절대 나오지 않으므로 안전하게 걸러낼 수 있다.
+const NGSP_CONST_NAMES = new Set(
+  ['false','true','boltz','c','e','echarge','i','kelvin','no','pi','planck','yes']);
+function looksLikeConstantsDump(headers) {
+  if (!headers || !headers.length) return false;
+  // x축(headers[0]) 제외한 신호명들이 전부 상수 집합에 속하면 상수 dump
+  const sig = headers.slice(1);
+  if (!sig.length) return false;
+  return sig.every(h => NGSP_CONST_NAMES.has(String(h).trim().toLowerCase()));
 }
 
 // stdout/stderr에서 display 출력 블록을 찾아 모든 vector 정보 추출
@@ -2203,6 +2217,17 @@ function handleResult(kind, data, dt) {
     parsed.types = ['voltage', 'voltage'];
   } else {
     parsed = buildRealParsed(data.data, vecInfo, kind === 'tran' ? 'time' : 'sweep');
+  }
+
+  // ── 2차 방어: 결과가 ngspice built-in 상수 plot(const) 이면 실패 처리 ──
+  if (looksLikeConstantsDump(parsed.headers)) {
+    clearStaleResults(kind);
+    setStatus(KIND_LABEL[kind] + ' — 시뮬 실패', 'err');
+    setRunMeta('분석이 실행되지 않음 (결과가 상수값 — sweep 소스 / 분석 라인 확인) (' + dt + ' ms)');
+    document.getElementById('btn-run').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+    updateTabCount(kind, 0, true);
+    return;
   }
 
   // ── 에러 + 데이터 부족 → 실패 처리 ──

@@ -222,9 +222,10 @@ SPICE 는 case-insensitive 라서 다음을 **반드시** 알아야 함:
 1. Cload 명시했는지
 2. AD/PD/AS/PS 명시했는지
 
-### 5.3 ngspice 의 silent failure — `constants` plot
-`.dc Vfake 0 5 0.1` 처럼 존재하지 않는 소스를 쓰면 `run` 이 조용히 실패하고 current plot 이 `constants` 로 남음. `wrdata all` 은 그 plot 의 built-in 상수 (`boltz`, `echarge`, `c`, `planck`, `pi`, `e`, `TRUE`, `FALSE`, `kelvin`, `kovq`, `i`, `yes`, `no`) 를 dump.
-→ wrapper 가 `$curplot` 을 echo 하고 JS 가 검사. `constants` 면 실패 처리 + view 클리어.
+### 5.3 ngspice 의 silent failure — `const` plot
+`.dc Vfake 0 5 0.1` 처럼 존재하지 않는 소스를 쓰면 `run` 이 조용히 실패하고 current plot 이 built-in 상수 plot 으로 남음. `wrdata all` 은 그 plot 의 상수 (`boltz`, `echarge`, `c`, `planck`, `pi`, `e`, `TRUE`, `FALSE`, `kelvin`, `i`, `yes`, `no`) 를 dump.
+→ **함정**: `echo $curplot` 이 출력하는 plot **이름은 `const`** 다 (`display` 의 타입 표기는 `constants` 지만 이름은 짧게 `const`). 그래서 `detectCurplotFailure` 정규식은 `/^const/i` 여야 한다 (`/^constants/` 로 쓰면 못 잡음 — 실제로 이 버그가 있었음).
+→ 2중 방어: `detectCurplotFailure` (curplot 이름 검사) + `looksLikeConstantsDump(headers)` (파싱된 신호명이 전부 상수 집합이면 실패). 둘 중 하나라도 걸리면 실패 처리 + view 클리어.
 
 ### 5.4 wrdata 의 복잡한 컬럼 매핑
 - `set wr_singlescale` 켜야 x 가 한 번만 나옴 (안 켜면 각 변수마다 x 반복)
