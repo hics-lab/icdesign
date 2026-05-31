@@ -178,6 +178,21 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 .param-row button.apply:hover{background:var(--secondary);color:#fff;}
 .param-row .hint{color:var(--muted);font-size:10px;font-style:italic;}
 
+/* PARAMETER SWEEP bar (under tab-toolbar) */
+.sweep-bar{padding:0 12px 8px;background:#fafbfd;border-bottom:1px solid var(--border);}
+.sweep-toggle{padding:3px 10px;border:1px solid var(--border);background:#fff;color:#8e44ad;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;}
+.sweep-toggle:hover{background:#f3eaf8;}
+.sweep-toggle.open{background:#8e44ad;color:#fff;border-color:#8e44ad;}
+.sweep-fields{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#faf5fd;border:1px solid #e0cdee;border-radius:5px;padding:6px 10px;margin-top:6px;font-size:11.5px;}
+.sweep-fields label{display:flex;align-items:center;gap:4px;color:#555;font-size:11px;}
+.sweep-fields input{padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-family:'Consolas',monospace;font-size:11px;color:var(--text);}
+.sweep-fields input:focus{outline:none;border-color:#8e44ad;box-shadow:0 0 0 2px rgba(142,68,173,.15);}
+.sweep-fields select{padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:11px;background:#fff;max-width:140px;}
+.sweep-fields .btn-sweep{padding:4px 12px;border:none;background:#8e44ad;color:#fff;border-radius:4px;cursor:pointer;font-size:11.5px;font-weight:600;margin-left:auto;}
+.sweep-fields .btn-sweep:hover{background:#7d3c9d;}
+.sweep-fields .btn-sweep:disabled{background:#c9b3d6;cursor:default;}
+.sweep-fields .hint{color:var(--muted);font-size:10px;font-style:italic;flex-basis:100%;}
+
 /* VAR SELECTOR (per tab, populated after Run) */
 .var-selector{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#fff;border:1px dashed var(--border);border-radius:5px;padding:6px 10px;margin-bottom:8px;font-size:11.5px;flex-shrink:0;}
 .var-selector .var-label{color:var(--primary);font-weight:700;font-size:11px;margin-right:4px;}
@@ -310,6 +325,18 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
       <button id="btn-run" class="btn btn-pri" onclick="runActiveTab()" title="현재 탭 실행 (F5 / Ctrl+Enter)">▶ Run <span id="run-kind">.tran</span><span class="kbd">F5</span></button>
       <button id="btn-stop" class="btn btn-warn" onclick="stopSim()" disabled title="실행 중지 (Esc)">■ Stop<span class="kbd">Esc</span></button>
       <span id="status" class="status">idle</span>
+    </div>
+
+    <div class="sweep-bar">
+      <button class="sweep-toggle" id="sweep-toggle" onclick="toggleSweep()" title="한 소자/파라미터를 여러 값으로 바꿔가며 곡선을 겹쳐 그립니다 (.tran/.dc/.ac)">⟲ 파라미터 Sweep</button>
+      <div class="sweep-fields" id="sweep-fields" hidden>
+        <label>소자 <select id="sw-dev"><option value="">(소자 선택)</option></select></label>
+        <label>파라미터 <input id="sw-param" placeholder="R/C/V는 비움" style="width:90px"></label>
+        <label>값들 <input id="sw-values" placeholder="1k, 2k, 5k, 10k" style="width:150px"></label>
+        <label>출력 <input id="sw-out" placeholder="비우면 전체" style="width:90px"></label>
+        <button class="btn-sweep" id="btn-run-sweep" onclick="runSweep()">▶ Sweep <span id="sweep-kind">.tran</span></button>
+        <span class="hint">예) 소자 <code>R1</code>, 파라미터 비움, 값들 <code>1k, 2k, 5k</code> → R1을 세 값으로 바꿔 현재 탭 분석을 겹쳐 그림. MOSFET은 파라미터 <code>W</code> 등 지정.</span>
+      </div>
     </div>
 
     <div class="tab-area">
@@ -1576,6 +1603,8 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + name));
   document.getElementById('run-kind').textContent = KIND_LABEL[name];
+  const swk = document.getElementById('sweep-kind');
+  if (swk) swk.textContent = KIND_LABEL[name];
   readParamsFromNetlist(name);
   // 활성 탭의 차트 리사이즈
   setTimeout(() => {
@@ -2024,18 +2053,26 @@ function runKind(kind) {
   _logEl.textContent = '';
   _logEl.classList.add('empty');
   appendLog('━━━ ' + KIND_LABEL[kind] + ' 실행 시작 ━━━\n');
-  const t0 = performance.now();
 
+  const outFile = '/' + kind + '.txt';
+  runNgspiceWorker(finalSrc, [outFile], (res) => {
+    handleResult(kind, {data: res.files[outFile] || '', stdout: res.stdout, stderr: res.stderr}, res.dt);
+  });
+}
+
+// ngspice WASM 을 Web Worker 로 1회 실행. outFiles 의 가상 FS 파일들을 읽어
+// onDone({files, stdout, stderr, dt}) 로 넘긴다. timeout/error 는 내부 처리.
+// (runKind 단일 실행과 runSweep 다중 실행이 공유)
+function runNgspiceWorker(finalSrc, outFiles, onDone) {
+  const t0 = performance.now();
   const baseUrl = (() => {
     const href = window.location.href;
     return href.substring(0, href.lastIndexOf('/') + 1);
   })();
 
-  const outFile = '/' + kind + '.txt';
-
   const workerCode = `
 self.onmessage = function(e) {
-  var netlist = e.data.netlist, model = e.data.model, outFile = e.data.outFile;
+  var netlist = e.data.netlist, model = e.data.model, outFiles = e.data.outFiles || [];
   var stdout = '', stderr = '';
   self.Module = {
     locateFile: function(p) { return '${baseUrl}' + p; },
@@ -2047,9 +2084,11 @@ self.onmessage = function(e) {
     print: function(t) { stdout += t + '\\n'; },
     printErr: function(t) { stderr += t + '\\n'; },
     postRun: [function() {
-      var data = '';
-      try { data = FS.readFile(outFile, {encoding: 'utf8'}); } catch(err) {}
-      self.postMessage({type: 'done', data: data, stdout: stdout, stderr: stderr});
+      var files = {};
+      outFiles.forEach(function(p) {
+        try { files[p] = FS.readFile(p, {encoding: 'utf8'}); } catch(err) {}
+      });
+      self.postMessage({type: 'done', files: files, stdout: stdout, stderr: stderr});
     }]
   };
   try {
@@ -2062,6 +2101,14 @@ self.onmessage = function(e) {
   const blob = new Blob([workerCode], {type: 'text/javascript'});
   const worker = new Worker(URL.createObjectURL(blob));
   currentWorker = worker;
+
+  const fail = (msg) => {
+    setStatus('worker error', 'err');
+    setRunMeta(msg);
+    appendLog('[worker error] ' + msg + '\n');
+    document.getElementById('btn-run').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+  };
 
   const timeoutId = setTimeout(() => {
     if (currentWorker === worker) {
@@ -2081,30 +2128,278 @@ self.onmessage = function(e) {
       worker.terminate();
       currentWorker = null;
       const dt = (performance.now() - t0).toFixed(0);
-      handleResult(kind, e.data, dt);
+      onDone({files: e.data.files || {}, stdout: e.data.stdout, stderr: e.data.stderr, dt});
     } else if (e.data.type === 'error') {
       clearTimeout(timeoutId);
       worker.terminate();
       currentWorker = null;
-      setStatus('worker error', 'err');
-      setRunMeta('오류: ' + e.data.message);
-      appendLog('[worker error] ' + e.data.message + '\n');
-      document.getElementById('btn-run').disabled = false;
-      document.getElementById('btn-stop').disabled = true;
+      fail('오류: ' + e.data.message);
     }
   };
   worker.onerror = (err) => {
     clearTimeout(timeoutId);
     worker.terminate();
     currentWorker = null;
-    setStatus('worker error', 'err');
-    setRunMeta('worker 오류: ' + (err.message || 'unknown'));
-    appendLog('[worker error] ' + (err.message || 'unknown') + '\n');
-    document.getElementById('btn-run').disabled = false;
-    document.getElementById('btn-stop').disabled = true;
+    fail('worker 오류: ' + (err.message || 'unknown'));
   };
 
-  worker.postMessage({netlist: finalSrc, model: ETRI_LIB, outFile: outFile});
+  worker.postMessage({netlist: finalSrc, model: ETRI_LIB, outFiles: outFiles});
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   파라미터 Sweep — 한 소자를 여러 값으로 바꿔가며 곡선을 겹쳐 그린다.
+   .control 안에서 alter <dev>=<val> 후 분석 명령을 반복 실행하고, 각 반복을
+   별도 파일(/sw<i>.txt)에 dump → JS가 변수명에 "@값" suffix 를 붙여 하나의
+   결과로 병합 → 기존 렌더러(체크박스/차트/Bode)가 곡선들을 그린다.
+   (cross-plot 벡터 참조 불가 + 같은 파일 wrdata 덮어쓰기 때문에 파일 분리 방식)
+═══════════════════════════════════════════════════════════════════════ */
+const SWEEP_MAX = 16;
+let sweepOpen = false;
+
+function toggleSweep() {
+  sweepOpen = !sweepOpen;
+  document.getElementById('sweep-fields').hidden = !sweepOpen;
+  document.getElementById('sweep-toggle').classList.toggle('open', sweepOpen);
+  if (sweepOpen) {
+    populateSweepDevices();
+    const swk = document.getElementById('sweep-kind');
+    if (swk) swk.textContent = KIND_LABEL[activeTab];
+  }
+}
+
+// netlist 최상위(.subckt 밖) 소자 인스턴스 이름 추출
+function detectDevices(src) {
+  const names = [];
+  let inSub = false;
+  for (const raw of src.split(/\r?\n/)) {
+    const ln = raw.trim();
+    if (!ln || ln.startsWith('*')) continue;
+    if (/^\.subckt\b/i.test(ln)) { inSub = true; continue; }
+    if (/^\.ends\b/i.test(ln))   { inSub = false; continue; }
+    if (inSub || ln.startsWith('.')) continue;
+    const m = ln.match(/^([A-Za-z][A-Za-z0-9_]*)/);
+    if (m && /^[RCLVIMQDJXEGFHB]/i.test(m[1])) names.push(m[1]);
+  }
+  return Array.from(new Set(names));
+}
+
+function populateSweepDevices() {
+  const sel = document.getElementById('sw-dev');
+  if (!sel) return;
+  const prev = sel.value;
+  const devs = detectDevices(cm.getValue());
+  sel.innerHTML = '<option value="">(소자 선택)</option>' +
+    devs.map(d => '<option value="' + d + '">' + d + '</option>').join('');
+  if (devs.indexOf(prev) >= 0) sel.value = prev;
+}
+
+// "1k, 2k, 5k" / "1k 2k 5k" → [{raw,num}, ...] (원본 문자열 유지, parseSiNum 검증)
+function parseSweepValues(str) {
+  const toks = (str || '').split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+  const out = [];
+  for (const t of toks) {
+    const n = parseSiNum(t);
+    if (!Number.isFinite(n)) return {error: '값 파싱 실패: "' + t + '" (예: 1k, 2k, 5Meg)'};
+    out.push({raw: t, num: n});
+    if (out.length > SWEEP_MAX) return {error: '값은 최대 ' + SWEEP_MAX + '개까지 가능합니다.'};
+  }
+  if (out.length < 2) return {error: '값을 2개 이상 입력하세요 (예: 1k, 2k, 5k).'};
+  return {values: out};
+}
+
+// sweep 용 netlist: .control 안에서 alter + 분석명령 + wrdata 를 값마다 반복
+function buildSweepNetlist(src, kind, dev, param, values, outVec) {
+  const myLine = extractAnalysisLine(src, kind);
+  if (!myLine) return null;
+  const cmd = myLine.replace(/^\s*\./, '').trim();  // .control 안에서는 dot 없는 명령형
+
+  let s = src.replace(/^\s*\.control\b[\s\S]*?^\s*\.endc\s*$/gim, '');
+  s = s.replace(/^\s*\.(tran|dc|ac|noise)\b.*$/gim, '');
+
+  const vec = (outVec && outVec.trim()) ? outVec.trim() : 'all';
+  const lines = ['.control', 'set wr_vecnames', 'set wr_singlescale'];
+  values.forEach((val, i) => {
+    lines.push(param ? ('alter ' + dev + ' ' + param + '=' + val.raw)
+                     : ('alter ' + dev + ' = ' + val.raw));
+    lines.push(cmd);
+    if (i === 0) {  // 첫 실행 후 한 번만 진단 마커 (실패 감지 + 변수 타입)
+      lines.push('echo "==NGSP_CURPLOT_BEGIN=="');
+      lines.push('echo $curplot');
+      lines.push('echo "==NGSP_CURPLOT_END=="');
+      lines.push('echo "==NGSP_VECTORS_BEGIN=="');
+      lines.push('display');
+      lines.push('echo "==NGSP_VECTORS_END=="');
+    }
+    lines.push('wrdata /sw' + i + '.txt ' + vec);
+  });
+  lines.push('quit');
+  lines.push('.endc');
+  const wrapper = lines.join('\n');
+
+  if (/^\s*\.end\s*$/im.test(s)) {
+    s = s.replace(/^\s*\.end\s*$/im, wrapper + '\n.end');
+  } else {
+    s = s + '\n' + wrapper + '\n.end';
+  }
+  return s;
+}
+
+function runSweep() {
+  if (currentWorker) return;
+  const kind = activeTab;
+  if (kind === 'noise') {
+    setStatus('noise sweep 미지원', 'err');
+    setRunMeta('파라미터 Sweep 은 .tran / .dc / .ac 에서만 지원됩니다.');
+    return;
+  }
+  const dev = (document.getElementById('sw-dev').value || '').trim();
+  if (!dev) { setStatus('소자 미선택', 'err'); setRunMeta('Sweep 할 소자를 선택하세요.'); return; }
+  const param  = (document.getElementById('sw-param').value || '').trim();
+  const outVec = (document.getElementById('sw-out').value || '').trim();
+  const pv = parseSweepValues(document.getElementById('sw-values').value);
+  if (pv.error) { setStatus('값 오류', 'err'); setRunMeta(pv.error); return; }
+  const values = pv.values;
+
+  writeAnalysisLineToNetlist(kind, true);   // 입력란 → netlist 동기화
+  const src = cm.getValue();
+  if (!detectAnalyses(src)[kind]) {
+    setStatus('netlist에 .' + kind + ' 없음', 'err');
+    setRunMeta(KIND_LABEL[kind] + ' 분석 라인이 필요합니다. 파라미터 입력란을 채우고 다시 시도하세요.');
+    return;
+  }
+  const finalSrc = buildSweepNetlist(src, kind, dev, param, values, outVec);
+  if (!finalSrc) { setStatus('netlist 빌드 실패', 'err'); return; }
+
+  setStatus('running sweep ' + KIND_LABEL[kind] + '…', 'run');
+  setRunMeta('Sweep — ' + dev + (param ? ' ' + param : '') + ' = [' + values.map(v => v.raw).join(', ') + ']');
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-stop').disabled = false;
+  const _logEl = document.getElementById('log-body');
+  _logEl.textContent = ''; _logEl.classList.add('empty');
+  appendLog('━━━ Sweep ' + KIND_LABEL[kind] + ' (' + values.length + ' runs) ━━━\n');
+
+  const outFiles = values.map((_, i) => '/sw' + i + '.txt');
+  runNgspiceWorker(finalSrc, outFiles, (res) => handleSweepResult(kind, values, res));
+}
+
+function handleSweepResult(kind, values, res) {
+  const dt = res.dt;
+  appendLog((res.stdout || '') + (res.stderr ? '\n--- stderr ---\n' + res.stderr : '') + '\n');
+  const fullLog = (res.stdout || '') + '\n' + (res.stderr || '');
+  const errs = detectNgspiceErrors(res.stdout, res.stderr);
+
+  const failOut = (msg) => {
+    clearStaleResults(kind);
+    setStatus(KIND_LABEL[kind] + ' sweep — 실패', 'err');
+    setRunMeta(msg + ' (' + dt + ' ms)');
+    document.getElementById('btn-run').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+    updateTabCount(kind, 0, true);
+  };
+
+  if (detectCurplotFailure(fullLog)) {
+    return failOut('분석이 실행되지 않음 (alter 소자/파라미터 또는 분석 라인 확인)');
+  }
+  const vecInfo = parseVectorNamesFromLog(fullLog);
+
+  const entries = [];
+  values.forEach((val, i) => {
+    const data = res.files['/sw' + i + '.txt'];
+    if (!data || !data.trim()) { appendLog('[sweep] 값 ' + val.raw + ' 결과 없음 — 건너뜀\n'); return; }
+    const parsed = (kind === 'ac')
+      ? buildAcParsed(data, vecInfo)
+      : buildRealParsed(data, vecInfo, kind === 'tran' ? 'time' : 'sweep');
+    if (!parsed.rows.length) { appendLog('[sweep] 값 ' + val.raw + ' 데이터 0행 — 건너뜀\n'); return; }
+    if (looksLikeConstantsDump(parsed.headers)) { appendLog('[sweep] 값 ' + val.raw + ' 상수 dump — 건너뜀\n'); return; }
+    entries.push({val, parsed});
+  });
+
+  if (!entries.length) return failOut('유효한 곡선 없음. Log 를 확인하세요');
+
+  const merged = (kind === 'ac') ? mergeSweepAc(entries) : mergeSweepReal(entries, kind);
+  if (!merged || !merged.rows.length) return failOut('곡선 병합 실패');
+
+  lastResults[kind] = merged;
+  document.getElementById('empty-' + kind).style.display = 'none';
+  document.getElementById('cc-' + kind).hidden = false;
+  renderResults(kind);
+  updateTabCount(kind, merged.rows.length, true);
+
+  const nCurves = merged.headers.length - 1;
+  if (errs.length) {
+    setStatus('sweep done w/ warnings (' + dt + ' ms)', 'err');
+    setRunMeta('⚠ ' + errs.slice(0, 2).join(' | ') + ' — ' + entries.length + ' runs, ' + nCurves + ' 곡선, ' + dt + ' ms');
+  } else {
+    setStatus('sweep done (' + dt + ' ms)', 'ok');
+    setRunMeta('Sweep 완료 — ' + entries.length + ' runs, ' + nCurves + ' 곡선, ' + dt + ' ms');
+  }
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+}
+
+// refX 그리드에 (xs,ys) 정렬. 길이 같으면 동일 그리드로 보고 그대로, 다르면 선형보간(ascending x)
+function _interpToRefX(refX, xs, ys) {
+  if (xs.length === refX.length) return ys.slice();
+  const out = new Array(refX.length);
+  let k = 0;
+  for (let r = 0; r < refX.length; r++) {
+    const x = refX[r];
+    while (k < xs.length - 2 && xs[k + 1] < x) k++;
+    const x0 = xs[k], x1 = xs[k + 1], y0 = ys[k], y1 = ys[k + 1];
+    out[r] = (x1 === x0) ? y0 : y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+  }
+  return out;
+}
+
+// tran/dc 병합: 변수 컬럼들을 "@값" suffix 로 모아 한 테이블로
+function mergeSweepReal(entries) {
+  const ref = entries[0].parsed;
+  const refX = ref.rows.map(r => r[0]);
+  const headers = [ref.headers[0]];
+  const types = [];
+  const cols = [];
+  entries.forEach(({val, parsed}) => {
+    const nv = parsed.headers.length - 1;
+    const xs = parsed.rows.map(r => r[0]);
+    for (let j = 1; j <= nv; j++) {
+      headers.push(parsed.headers[j] + ' @' + val.raw);
+      types.push((parsed.types && parsed.types[j - 1]) || 'voltage');
+      cols.push(_interpToRefX(refX, xs, parsed.rows.map(r => r[j])));
+    }
+  });
+  const rows = refX.map((x, r) => {
+    const row = [x];
+    for (const c of cols) row.push(c[r]);
+    return row;
+  });
+  return {headers, types, rows};
+}
+
+// ac 병합: 동일 freq 그리드 가정, 각 변수×값 의 {mag,phase} trace 를 모은다
+function mergeSweepAc(entries) {
+  const ref = entries[0].parsed;
+  const refLen = ref.rows.length;
+  const headers = [ref.headers[0]];
+  const types = [];
+  const traceCols = [];
+  entries.forEach(({val, parsed}) => {
+    if (parsed.rows.length !== refLen) {
+      appendLog('[sweep] 값 ' + val.raw + ' freq 그리드 불일치 — 건너뜀\n');
+      return;
+    }
+    const nv = parsed.headers.length - 1;
+    for (let k = 0; k < nv; k++) {
+      headers.push(parsed.headers[k + 1] + ' @' + val.raw);
+      types.push((parsed.types && parsed.types[k]) || 'voltage');
+      traceCols.push(parsed.rows.map(row => row.traces[k]));
+    }
+  });
+  if (!traceCols.length) return null;
+  const rows = ref.rows.map((r, idx) => ({
+    freq: r.freq,
+    traces: traceCols.map(col => col[idx])
+  }));
+  return {headers, types, rows};
 }
 
 function stopSim() {
