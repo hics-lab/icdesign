@@ -149,6 +149,9 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 .view .view-allbtns{display:flex;gap:3px;}
 .view .view-allbtns button{flex:1;font-size:10px;padding:2px 0;border:1px solid var(--border);background:#fff;border-radius:3px;cursor:pointer;color:var(--text);}
 .view .view-allbtns button:hover{background:#eef2f7;}
+.view .var-filter{flex-shrink:0;width:100%;box-sizing:border-box;padding:3px 6px;border:1px solid var(--border);border-radius:3px;font-size:10.5px;font-family:'Consolas','Courier New',monospace;color:var(--text);}
+.view .var-filter::placeholder{color:var(--muted);}
+.view .var-filter:focus{outline:none;border-color:var(--secondary);box-shadow:0 0 0 2px rgba(41,128,185,.15);}
 .view .view-chart{flex:1;min-height:0;min-width:0;position:relative;}
 .view .view-chart > canvas{position:absolute!important;top:0;left:0;width:100%!important;height:100%!important;}
 /* Bode plot — two stacked canvases (mag on top, phase below) sharing x-axis */
@@ -2707,6 +2710,17 @@ function addView(tab, kind, isDuplicate) {
   allBtns.appendChild(allBtn); allBtns.appendChild(noneBtn);
   left.appendChild(allBtns);
 
+  // 신호 필터 (맨 아래) — 곡선이 많을 때만 표시. 입력한 문자열에 맞는 곡선만 표시.
+  const filterInput = document.createElement('input');
+  filterInput.type = 'text';
+  filterInput.className = 'var-filter';
+  filterInput.placeholder = '🔍 신호 필터';
+  filterInput.title = '신호명 일부를 입력하면 해당 곡선만 표시 (예: out, @2k). 비우면 전체.';
+  filterInput.style.display = 'none';
+  filterInput.addEventListener('input', () => applyVarFilter(view));
+  left.appendChild(filterInput);
+  view.filterInput = filterInput;
+
   el.appendChild(left);
 
   const right = document.createElement('div');
@@ -2893,13 +2907,17 @@ function buildViewVarList(tab, view, listEl) {
     const isChecked = (name in sel) ? !!sel[name] : true;
 
     const lbl = document.createElement('label');
+    lbl.dataset.vname = name;
+    lbl.dataset.vidx = String(k);
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = isChecked;
     cb.dataset.idx = String(k);
     cb.addEventListener('change', () => {
       varSelections[tab][name] = cb.checked;
-      toggleViewVar(view, k, cb.checked);
+      const q = _varFilterQ(view);
+      const match = !q || name.toLowerCase().includes(q);
+      toggleViewVar(view, k, cb.checked && match);
       saveToLocalStorage();
     });
     const swatch = document.createElement('span');
@@ -2915,6 +2933,38 @@ function buildViewVarList(tab, view, listEl) {
     // 초기 차트 상태가 dataset visible이므로, 저장된 상태가 false면 해당 dataset를 hide
     if (!isChecked) toggleViewVar(view, k, false);
   });
+
+  // 곡선이 많으면(주로 sweep 결과) 필터 입력을 노출
+  if (view.filterInput) {
+    view.filterInput.style.display = (listEl.children.length > 4) ? '' : 'none';
+    if (view.filterInput.value) applyVarFilter(view);
+  }
+}
+
+// 현재 필터 질의 문자열 (소문자)
+function _varFilterQ(view) {
+  return ((view.filterInput && view.filterInput.value) || '').trim().toLowerCase();
+}
+
+// 신호 필터 적용 — 이름이 매칭되는 행만 목록에 표시하고, 매칭+체크된 곡선만 차트에 표시
+function applyVarFilter(view) {
+  if (!view.element) return;
+  const q = _varFilterQ(view);
+  view.element.querySelectorAll('.var-list label').forEach(lbl => {
+    const name = lbl.dataset.vname || '';
+    const match = !q || name.toLowerCase().includes(q);
+    lbl.style.display = match ? '' : 'none';
+    const k = parseInt(lbl.dataset.vidx, 10);
+    const cb = lbl.querySelector('input[type="checkbox"]');
+    const visible = match && cb && cb.checked;
+    const dsIdx = view.varToDataset ? view.varToDataset[k] : -1;
+    if (dsIdx >= 0) {
+      for (const c of [view.chart, view.chart2]) {
+        if (c && c.data.datasets[dsIdx]) c.data.datasets[dsIdx].hidden = !visible;
+      }
+    }
+  });
+  for (const c of [view.chart, view.chart2]) if (c) c.update('none');
 }
 
 function toggleViewVar(view, varIdx, visible) {
