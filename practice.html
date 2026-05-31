@@ -1783,6 +1783,10 @@ function buildWrapper(kind) {
   // wr_vecnames: wrdata 첫 줄에 헤더(컬럼 이름) 추가 → 컬럼 매핑이 명확해짐
   // wr_singlescale: x를 매 변수마다 반복하지 않고 행 시작에 1번만 → 깔끔한 (x, y0, y1, ...) 형식
   const lines = ['.control', 'set wr_vecnames', 'set wr_singlescale', 'run'];
+  // run 후 현재 plot 이름을 출력 → 실패하면 "constants" 가 나옴 → JS에서 감지
+  lines.push('echo "==NGSP_CURPLOT_BEGIN=="');
+  lines.push('echo $curplot');
+  lines.push('echo "==NGSP_CURPLOT_END=="');
   if (kind === 'noise') {
     // .noise 실행 후 ngspice는 plot 2개를 만든다:
     //   noise1 = 주파수별 spectral density (inoise_spectrum, onoise_spectrum)
@@ -1801,6 +1805,17 @@ function buildWrapper(kind) {
   lines.push('quit');
   lines.push('.endc');
   return lines.join('\n');
+}
+
+// run 후 current plot 이 "constants" 면 분석이 실제로 실행되지 않은 것 (예: .dc src 부재)
+function detectCurplotFailure(log) {
+  if (!log) return false;
+  const m = log.match(/==NGSP_CURPLOT_BEGIN==([\s\S]*?)==NGSP_CURPLOT_END==/);
+  if (!m) return false;
+  const plot = m[1].trim().split(/\s+/)[0] || '';
+  // 분석 성공 시 plot 이름: tran1, dc1, ac1, noise1/noise2
+  // 실패 시: constants (ngspice 의 built-in 상수 plot)
+  return /^constants/i.test(plot);
 }
 
 // stdout/stderr에서 display 출력 블록을 찾아 모든 vector 정보 추출
@@ -2154,11 +2169,16 @@ function handleResult(kind, data, dt) {
   appendLog(log + '\n');
 
   // ── 0) 에러 라인 스캔 ──
+  const fullLogForCheck = (data.stdout || '') + '\n' + (data.stderr || '');
   const errs = detectNgspiceErrors(data.stdout, data.stderr);
+  const curplotFailed = detectCurplotFailure(fullLogForCheck);
+  if (curplotFailed) {
+    errs.unshift('분석이 실행되지 않음 (current plot = constants — sweep 소스 / 분석 라인 확인)');
+  }
   const hasErrors = errs.length > 0;
   const errSummary = hasErrors ? errs.slice(0, 2).join(' | ') : '';
 
-  if (!data.data || !data.data.trim()) {
+  if (curplotFailed || !data.data || !data.data.trim()) {
     clearStaleResults(kind);
     setStatus(KIND_LABEL[kind] + ' — 시뮬 실패', 'err');
     setRunMeta(hasErrors
