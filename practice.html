@@ -2110,13 +2110,60 @@ function appendLog(text) {
   document.getElementById('log-meta').textContent = el.textContent.length + ' chars';
 }
 
+// ngspice stdout/stderr 에서 실패 의미하는 라인들을 추출
+function detectNgspiceErrors(stdout, stderr) {
+  const text = (stdout || '') + '\n' + (stderr || '');
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  const patterns = [
+    /^\s*error\b/i,
+    /^\s*fatal\b/i,
+    /^\s*\*\s*(?:error|fatal)/i,
+    /not\s+in\s+circuit/i,
+    /singular\s+matrix/i,
+    /no\s+such\s+(?:vector|parameter|device)/i,
+    /can'?t\s+(?:find|run|open)/i,
+    /unknown\s+(?:parameter|subcircuit|model)/i,
+    /simulation\s+(?:aborted|interrupted)/i,
+    /no\s+convergence/i,
+    /timestep\s+too\s+small/i
+  ];
+  for (const ln of lines) {
+    const tr = ln.trim();
+    if (!tr) continue;
+    for (const re of patterns) {
+      if (re.test(tr)) { out.push(tr); break; }
+    }
+  }
+  // dedup while preserving order
+  return Array.from(new Set(out));
+}
+
+// 시뮬 실패 시 이전 결과 / 화면 정리 (stale view 방지)
+function clearStaleResults(kind) {
+  lastResults[kind] = null;
+  if (typeof clearViews === 'function') clearViews(kind);
+  const empty = document.getElementById('empty-' + kind);
+  const cc = document.getElementById('cc-' + kind);
+  if (empty) empty.style.display = '';
+  if (cc) cc.hidden = true;
+}
+
 function handleResult(kind, data, dt) {
   const log = (data.stdout || '') + (data.stderr ? '\n--- stderr ---\n' + data.stderr : '');
   appendLog(log + '\n');
 
+  // ── 0) 에러 라인 스캔 ──
+  const errs = detectNgspiceErrors(data.stdout, data.stderr);
+  const hasErrors = errs.length > 0;
+  const errSummary = hasErrors ? errs.slice(0, 2).join(' | ') : '';
+
   if (!data.data || !data.data.trim()) {
-    setStatus(KIND_LABEL[kind] + ' — 데이터 없음', 'err');
-    setRunMeta('출력 파일 비어있음. Log를 확인하세요. (' + dt + ' ms)');
+    clearStaleResults(kind);
+    setStatus(KIND_LABEL[kind] + ' — 시뮬 실패', 'err');
+    setRunMeta(hasErrors
+      ? 'ngspice 오류: ' + errSummary + ' (' + dt + ' ms)'
+      : '출력 파일 비어있음. Log를 확인하세요. (' + dt + ' ms)');
     document.getElementById('btn-run').disabled = false;
     document.getElementById('btn-stop').disabled = true;
     updateTabCount(kind, 0, true);
@@ -2138,18 +2185,34 @@ function handleResult(kind, data, dt) {
     parsed = buildRealParsed(data.data, vecInfo, kind === 'tran' ? 'time' : 'sweep');
   }
 
-  if (parsed.rows.length) {
-    lastResults[kind] = parsed;
-    document.getElementById('empty-' + kind).style.display = 'none';
-    document.getElementById('cc-' + kind).hidden = false;
-    renderResults(kind);
+  // ── 에러 + 데이터 부족 → 실패 처리 ──
+  if (!parsed.rows.length) {
+    clearStaleResults(kind);
+    setStatus(KIND_LABEL[kind] + ' — 시뮬 실패', 'err');
+    setRunMeta(hasErrors
+      ? 'ngspice 오류: ' + errSummary + ' (' + dt + ' ms)'
+      : '결과 데이터 없음. Log를 확인하세요. (' + dt + ' ms)');
+    document.getElementById('btn-run').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+    updateTabCount(kind, 0, true);
+    return;
   }
+
+  // ── 성공 ──
+  lastResults[kind] = parsed;
+  document.getElementById('empty-' + kind).style.display = 'none';
+  document.getElementById('cc-' + kind).hidden = false;
+  renderResults(kind);
   updateTabCount(kind, parsed.rows.length, true);
 
-  setStatus('done (' + dt + ' ms)', 'ok');
-  const r = lastResults[kind];
-  const npts = r ? r.rows.length : 0;
-  setRunMeta(KIND_LABEL[kind] + ' 완료 — ' + npts + ' pts, ' + dt + ' ms');
+  // 에러 라인이 있어도 데이터가 잡혔으면 경고로 표시 (예: convergence warning)
+  if (hasErrors) {
+    setStatus('done w/ warnings (' + dt + ' ms)', 'err');
+    setRunMeta('⚠ ' + errSummary + ' — ' + parsed.rows.length + ' pts, ' + dt + ' ms');
+  } else {
+    setStatus('done (' + dt + ' ms)', 'ok');
+    setRunMeta(KIND_LABEL[kind] + ' 완료 — ' + parsed.rows.length + ' pts, ' + dt + ' ms');
+  }
 
   document.getElementById('btn-run').disabled = false;
   document.getElementById('btn-stop').disabled = true;
