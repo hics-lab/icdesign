@@ -1058,6 +1058,8 @@ let chartViews = {tran: [], dc: [], ac: [], noise: []};
 let activeViewIdx = {tran: 0, dc: 0, ac: 0, noise: 0};
 // 변수 선택 상태 (시뮬레이션 재실행 시 유지). 키 = 변수 이름. 값이 false면 해제됨, 미지정 = 체크됨(기본).
 let varSelections = {tran: {}, dc: {}, ac: {}, noise: {}};
+// 신호 필터 문자열 (탭+뷰종류별, 재실행/새로고침 후에도 유지). 키 = view.kind ('V'/'I'/'bode'/'noise')
+let viewFilters = {tran: {}, dc: {}, ac: {}, noise: {}};
 let viewIdCounter = 0;
 let lastResults = {tran:null, dc:null, ac:null, noise:null};
 let currentWorker = null;
@@ -1351,7 +1353,8 @@ function serializeState() {
     },
     logHeight: log ? log.offsetHeight : 240,
     leftWidth: leftPanel ? leftPanel.offsetWidth : null,
-    varSelections: varSelections
+    varSelections: varSelections,
+    viewFilters: viewFilters
   };
 }
 
@@ -1435,6 +1438,14 @@ function applyState(state) {
     for (const k of ['tran','dc','ac','noise']) {
       if (state.varSelections[k] && typeof state.varSelections[k] === 'object') {
         varSelections[k] = state.varSelections[k];
+      }
+    }
+  }
+  // 5-2. 신호 필터 문자열
+  if (state.viewFilters && typeof state.viewFilters === 'object') {
+    for (const k of ['tran','dc','ac','noise']) {
+      if (state.viewFilters[k] && typeof state.viewFilters[k] === 'object') {
+        viewFilters[k] = state.viewFilters[k];
       }
     }
   }
@@ -2717,7 +2728,13 @@ function addView(tab, kind, isDuplicate) {
   filterInput.placeholder = '🔍 필터 (이름 OR @값)';
   filterInput.title = '이름 단어끼리 OR, @값 단어끼리 OR, 이름과 @값은 AND.\n예) "vmid @1 @2 @3" → vmid 이면서 (@1·@2·@3 중 하나)\n    "out in" → out 또는 in\n    "@1k @10k" → 해당 값만\n비우면 전체.';
   filterInput.style.display = 'none';
-  filterInput.addEventListener('input', () => applyVarFilter(view));
+  // 재실행/새로고침 후에도 유지: 저장된 필터 문자열 복원
+  filterInput.value = (viewFilters[tab] && viewFilters[tab][kind]) || '';
+  filterInput.addEventListener('input', () => {
+    if (viewFilters[tab]) viewFilters[tab][view.kind] = filterInput.value;
+    applyVarFilter(view);
+    saveToLocalStorage();
+  });
   left.appendChild(filterInput);
   view.filterInput = filterInput;
 
@@ -2933,10 +2950,11 @@ function buildViewVarList(tab, view, listEl) {
     if (!isChecked) toggleViewVar(view, k, false);
   });
 
-  // 곡선이 많으면(주로 sweep 결과) 필터 입력을 노출
+  // 곡선이 많으면(주로 sweep 결과) 또는 저장된 필터가 있으면 필터 입력을 노출
   if (view.filterInput) {
-    view.filterInput.style.display = (listEl.children.length > 4) ? '' : 'none';
-    if (view.filterInput.value) applyVarFilter(view);
+    const hasSaved = !!view.filterInput.value.trim();
+    view.filterInput.style.display = (listEl.children.length > 4 || hasSaved) ? '' : 'none';
+    if (hasSaved) applyVarFilter(view);
   }
 }
 
