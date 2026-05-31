@@ -2714,8 +2714,8 @@ function addView(tab, kind, isDuplicate) {
   const filterInput = document.createElement('input');
   filterInput.type = 'text';
   filterInput.className = 'var-filter';
-  filterInput.placeholder = '🔍 필터 (공백=OR)';
-  filterInput.title = '신호명 일부 입력 시 해당 곡선만 표시. 공백으로 여러 단어를 넣으면 OR 검색 (예: "out @2k" → out 또는 @2k 포함). 비우면 전체.';
+  filterInput.placeholder = '🔍 필터 (이름 OR @값)';
+  filterInput.title = '이름 단어끼리 OR, @값 단어끼리 OR, 이름과 @값은 AND.\n예) "vmid @1 @2 @3" → vmid 이면서 (@1·@2·@3 중 하나)\n    "out in" → out 또는 in\n    "@1k @10k" → 해당 값만\n비우면 전체.';
   filterInput.style.display = 'none';
   filterInput.addEventListener('input', () => applyVarFilter(view));
   left.appendChild(filterInput);
@@ -2945,13 +2945,21 @@ function _varFilterQ(view) {
   return ((view.filterInput && view.filterInput.value) || '').trim().toLowerCase();
 }
 
-// 공백으로 구분된 여러 단어 중 하나라도 포함하면 매칭 (OR 검색). 비우면 전체 매칭.
+// 공백으로 구분된 단어 매칭. 이름 단어끼리 OR, @값 단어끼리 OR, 두 그룹은 AND.
+//   예: "vmid @1 @2 @3" → 이름에 vmid 포함 AND (@1 또는 @2 또는 @3)
+//       "out in"        → out 또는 in (이름 OR)
+//       "@1 @2"         → 값이 @1 또는 @2
+// 비우면 전체 매칭.
 function _varNameMatches(q, name) {
   if (!q) return true;
   const terms = q.split(/\s+/).filter(Boolean);
   if (!terms.length) return true;
   const lname = name.toLowerCase();
-  return terms.some(t => lname.includes(t));
+  const atTerms   = terms.filter(t => t.startsWith('@'));
+  const nameTerms = terms.filter(t => !t.startsWith('@'));
+  const nameOk = !nameTerms.length || nameTerms.some(t => lname.includes(t));
+  const atOk   = !atTerms.length   || atTerms.some(t => lname.includes(t));
+  return nameOk && atOk;
 }
 
 // 신호 필터 적용 — 이름이 매칭되는 행만 목록에 표시하고, 매칭+체크된 곡선만 차트에 표시
