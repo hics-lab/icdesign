@@ -152,6 +152,11 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 .view .var-filter{flex-shrink:0;width:100%;box-sizing:border-box;padding:3px 6px;border:1px solid var(--border);border-radius:3px;font-size:10.5px;font-family:'Consolas','Courier New',monospace;color:var(--text);}
 .view .var-filter::placeholder{color:var(--muted);}
 .view .var-filter:focus{outline:none;border-color:var(--secondary);box-shadow:0 0 0 2px rgba(41,128,185,.15);}
+/* 차트 줌 컨트롤 (＋ 확대 / － 축소 / ⟲ 원상복구) — 차트 우상단, 호버 시 진해짐 */
+.view .chart-zoom-ctrls{position:absolute;top:4px;right:4px;z-index:11;display:flex;gap:2px;opacity:.4;transition:opacity .12s;}
+.view .view-chart:hover .chart-zoom-ctrls{opacity:1;}
+.view .chart-zoom-ctrls button{width:22px;height:22px;padding:0;border:1px solid var(--border);background:rgba(255,255,255,.92);border-radius:3px;cursor:pointer;font-size:13px;line-height:1;color:var(--text);display:flex;align-items:center;justify-content:center;}
+.view .chart-zoom-ctrls button:hover{background:var(--secondary);color:#fff;border-color:var(--secondary);}
 .view .view-chart{flex:1;min-height:0;min-width:0;position:relative;}
 .view .view-chart > canvas{position:absolute!important;top:0;left:0;width:100%!important;height:100%!important;}
 /* Bode plot — two stacked canvases (mag on top, phase below) sharing x-axis */
@@ -2767,6 +2772,8 @@ function addView(tab, kind, isDuplicate) {
     canvas = document.createElement('canvas');
     right.appendChild(canvas);
   }
+  // 줌 컨트롤 버튼 (라인 차트 뷰에만 — noise 는 자체 패널이 있어 제외)
+  if (kind !== 'noise') addChartZoomControls(view, right);
   el.appendChild(right);
 
   document.getElementById('views-content-' + tab).appendChild(el);
@@ -3291,6 +3298,36 @@ function chartOpts(xlab, ylab, xLog, yLog) {
       }
     }
   };
+}
+
+// 뷰의 차트(들)를 factor 배율로 확대(>1)/축소(<1). bode 는 mag/phase 둘 다.
+function zoomViewCharts(view, factor) {
+  for (const c of [view.chart, view.chart2]) {
+    if (c && typeof c.zoom === 'function') c.zoom(factor);
+  }
+}
+// 뷰의 차트(들)를 원래 범위로 복구
+function resetViewCharts(view) {
+  for (const c of [view.chart, view.chart2]) {
+    if (c && typeof c.resetZoom === 'function') c.resetZoom();
+  }
+}
+// 차트 우상단에 ＋ / － / ⟲ 버튼 추가 (휠·더블클릭의 보이는 대체 수단)
+function addChartZoomControls(view, container) {
+  const bar = document.createElement('div');
+  bar.className = 'chart-zoom-ctrls';
+  const mk = (txt, title, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = txt;
+    b.title = title;
+    b.onclick = (e) => { e.stopPropagation(); fn(); };
+    bar.appendChild(b);
+  };
+  mk('＋', '확대 (마우스 휠 위로도 가능)', () => zoomViewCharts(view, 1.25));
+  mk('－', '축소 (마우스 휠 아래로도 가능)', () => zoomViewCharts(view, 0.8));
+  mk('⟲', '원상복구 (차트 더블클릭도 가능)', () => resetViewCharts(view));
+  container.appendChild(bar);
 }
 
 // 우클릭 드래그로 영역 zoom + 더블클릭으로 reset
