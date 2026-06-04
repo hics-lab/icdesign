@@ -139,7 +139,9 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 .view{display:none;flex:1;min-height:0;gap:8px;}
 .view.active{display:flex;}
 .view .view-vars{width:155px;flex-shrink:0;display:flex;flex-direction:column;gap:5px;padding-right:8px;border-right:1px solid var(--border);min-height:0;}
-.view .view-vars-head{font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;}
+.view .view-vars-head{font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.view .mag-scale-sel{font-size:10px;font-weight:600;padding:1px 3px;border:1px solid var(--border);border-radius:3px;background:#fff;color:var(--text);text-transform:none;letter-spacing:0;cursor:pointer;}
+.view .mag-scale-sel:focus{outline:none;border-color:var(--secondary);}
 .view .var-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:1px;padding-right:2px;}
 .view .var-list label{display:flex;align-items:center;gap:5px;cursor:pointer;padding:2px 4px;border-radius:3px;font-family:'Consolas','Courier New',monospace;font-size:11px;line-height:1.3;}
 .view .var-list label:hover{background:rgba(41,128,185,.08);}
@@ -1065,6 +1067,8 @@ let activeViewIdx = {tran: 0, dc: 0, ac: 0, noise: 0};
 let varSelections = {tran: {}, dc: {}, ac: {}, noise: {}};
 // 신호 필터 문자열 (탭+뷰종류별, 재실행/새로고침 후에도 유지). 키 = view.kind ('V'/'I'/'bode'/'noise')
 let viewFilters = {tran: {}, dc: {}, ac: {}, noise: {}};
+// Bode magnitude y축 스케일 ('db'|'log'|'lin') — 세션 동안 마지막 선택 유지
+let bodeMagScale = 'db';
 let viewIdCounter = 0;
 let lastResults = {tran:null, dc:null, ac:null, noise:null};
 let currentWorker = null;
@@ -2025,7 +2029,8 @@ function buildAcParsed(txt, vecInfo) {
       const im = v.isComplex ? r[v.dataIdxIm] : 0;
       const mag = Math.sqrt(re*re + im*im);
       return {
-        mag: 20 * Math.log10(Math.max(mag, 1e-30)),
+        magLin: mag,                                  // 선형 크기 |H| (log/linear 축용)
+        mag: 20 * Math.log10(Math.max(mag, 1e-30)),   // dB (기본)
         phase: Math.atan2(im, re) * 180 / Math.PI
       };
     })
@@ -2735,6 +2740,23 @@ function addView(tab, kind, isDuplicate) {
   const head = document.createElement('div');
   head.className = 'view-vars-head';
   head.textContent = baseTitle;
+  // Bode: magnitude y축 스케일 선택 (dB / log / linear)
+  if (kind === 'bode') {
+    view.magScale = view.magScale || bodeMagScale;
+    const sc = document.createElement('select');
+    sc.className = 'mag-scale-sel';
+    sc.title = 'Magnitude(상단 그래프) y축 스케일';
+    [['db', 'dB'], ['log', 'log'], ['lin', 'linear']].forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = t;
+      sc.appendChild(o);
+    });
+    sc.value = view.magScale;
+    sc.onclick = (e) => e.stopPropagation();
+    sc.onchange = () => { view.magScale = bodeMagScale = sc.value; applyBodeMagScale(view); };
+    head.appendChild(document.createTextNode(' '));
+    head.appendChild(sc);
+  }
   left.appendChild(head);
 
   const varList = document.createElement('div');
@@ -2847,9 +2869,14 @@ function buildViewChart(tab, view, canvas, canvas2) {
     const acVars = labels
       .map((name, k) => ({k, name, isI: types[k] === 'current'}))
       .filter(v => !v.isI);
+    view._tab = tab;
+    view._acVars = acVars;
+    view.magScale = view.magScale || bodeMagScale;   // 'db' | 'log' | 'lin'
+    // magnitude y값: dB 모드는 미리 계산된 trace.mag, 그 외는 선형 |H|
+    const magY = (t) => (view.magScale === 'db') ? t.mag : t.magLin;
     const makeDs = (which) => acVars.map(({k, name}) => ({
       label: name,
-      data: parsed.rows.map(r => ({x: r.freq, y: r.traces[k][which]})),
+      data: parsed.rows.map(r => ({x: r.freq, y: (which === 'mag') ? magY(r.traces[k]) : r.traces[k][which]})),
       borderColor: getColor(k),
       backgroundColor: getColor(k),
       borderDash: getDash(k),
@@ -2860,7 +2887,7 @@ function buildViewChart(tab, view, canvas, canvas2) {
       view.varToDataset[k] = (types[k] !== 'current') ? dsIdx++ : -1;
     });
 
-    const optsMag = chartOpts('', '|H| [dB]', true, false);
+    const optsMag = chartOpts('', (view.magScale === 'db') ? '|H| [dB]' : '|H|', true, view.magScale === 'log');
     optsMag.scales.x.title.display = false; // x-label only on bottom plot
     const optsPhase = chartOpts('frequency [Hz]', '∠H [deg]', true, false);
     optsPhase.plugins.legend.display = false; // single legend on top
@@ -3337,6 +3364,26 @@ function resetViewCharts(view) {
   for (const c of [view.chart, view.chart2]) {
     if (c && typeof c.resetZoom === 'function') c.resetZoom();
   }
+}
+
+// Bode magnitude y축 스케일 전환 (view.magScale: 'db' | 'log' | 'lin')
+function applyBodeMagScale(view) {
+  const c = view.chart;
+  if (!c || !view._acVars) return;
+  const parsed = lastResults[view._tab];
+  if (!parsed) return;
+  const scale = view.magScale || 'db';
+  view._acVars.forEach((av, i) => {
+    const ds = c.data.datasets[i];
+    if (!ds) return;
+    ds.data = parsed.rows.map(r => ({
+      x: r.freq,
+      y: (scale === 'db') ? r.traces[av.k].mag : r.traces[av.k].magLin
+    }));
+  });
+  c.options.scales.y.type = (scale === 'log') ? 'logarithmic' : 'linear';
+  c.options.scales.y.title.text = (scale === 'db') ? '|H| [dB]' : '|H|';
+  c.update('none');
 }
 // 차트 우상단에 ＋ / － / ⟲ 버튼 추가 (휠·더블클릭의 보이는 대체 수단)
 function addChartZoomControls(view, container) {
