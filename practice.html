@@ -2684,7 +2684,7 @@ function stopSim() {
 function filterNoiseLog(text) {
   return text
     .replace(/^.*fopen\("\/proc\/meminfo"\): No such file or directory.*\r?\n?/gm, '')
-    .replace(/^Note: can't find init file\.\r?\n?/gm, '');
+    .replace(/^\s*Note: can'?t find init file\.?.*\r?\n?/gim, '');
 }
 
 function appendLog(text) {
@@ -2700,7 +2700,9 @@ function appendLog(text) {
 
 // ngspice stdout/stderr 에서 실패 의미하는 라인들을 추출
 function detectNgspiceErrors(stdout, stderr) {
-  const text = (stdout || '') + '\n' + (stderr || '');
+  // 무해한 잡음 메시지는 먼저 제거 — 특히 "Note: can't find init file." 이
+  // 아래 /can't find/ 패턴에 걸려 모든 실행이 "done w/ warnings" 로 표시되던 문제
+  const text = filterNoiseLog((stdout || '') + '\n' + (stderr || ''));
   const lines = text.split(/\r?\n/);
   const out = [];
   const patterns = [
