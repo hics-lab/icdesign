@@ -267,9 +267,136 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 ::-webkit-scrollbar-thumb{background:#bdc3c7;border-radius:3px;}
 .log-body::-webkit-scrollbar-track{background:#1e272e;}
 .log-body::-webkit-scrollbar-thumb{background:#4d5b66;}
+
+/* ════════════════════════════════════════════════════════════════════
+   MOBILE / 좁은 화면 (폭 < 900px: 폰, 세로 태블릿)
+   — 2단 grid 대신 한 칸 + 상단 [편집 | 결과 | 로그] 전환.
+   — 화면 전환은 body.mv-edit / mv-result / mv-log 클래스 (JS: setMobileView).
+   — PC 레이아웃은 이 블록 밖이라 영향 없음. .m-nav 는 PC 에서 숨김.
+═══════════════════════════════════════════════════════════════════════ */
+.m-nav{display:none;}
+.view canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+@media (max-width: 899px){
+  html{-webkit-text-size-adjust:100%;}
+  body{height:100vh;height:100dvh;display:flex;flex-direction:column;font-size:14px;-webkit-tap-highlight-color:transparent;}
+
+  /* header — 제목 + 아이콘 버튼만 */
+  header{height:auto;min-height:46px;padding:5px 8px 5px 12px;gap:8px;flex-shrink:0;}
+  header h1{font-size:15px;white-space:nowrap;}
+  .subtitle,.hctrl .badge,.hctrl .btn .lbl{display:none;}
+  .hctrl{gap:4px;}
+  .hctrl .btn{min-width:38px;min-height:36px;padding:4px 8px;font-size:17px;line-height:1;}
+
+  /* 화면 전환 바 + Run/Stop (JS 가 #btn-run/#btn-stop 을 이리로 옮김) */
+  .m-nav{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .m-seg{display:flex;flex:1;min-width:0;background:#e8eef3;border-radius:9px;padding:3px;gap:2px;}
+  .m-seg button{flex:1;min-width:0;border:none;background:none;padding:7px 2px;font-size:14px;font-weight:600;color:var(--muted);border-radius:7px;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .m-seg button.active{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.14);}
+  .m-seg .dot{display:none;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:4px;vertical-align:middle;}
+  .m-seg button.has-new .dot{display:inline-block;}
+  .m-run{display:flex;gap:4px;flex-shrink:0;}
+  .m-run .btn{min-height:38px;padding:6px 11px;font-size:14px;border-radius:7px;white-space:nowrap;}
+  .m-run #btn-stop .lbl{display:none;}
+  .btn .kbd,.tab .kbd{display:none;}
+
+  /* 본문 — 한 칸 */
+  .grid{display:flex!important;flex-direction:column;flex:1;min-height:0;height:auto;padding:6px;gap:0;}
+  .resizer-v,.resizer-h{display:none!important;}
+  .panel{flex:1;min-height:0;}
+  body.mv-edit .panel.right,body.mv-log .panel.right{display:none;}
+  body.mv-result .panel.left{display:none;}
+
+  /* 편집 화면: 탭바 + 에디터 + sweep / 로그 화면: 로그만 */
+  .left{display:flex;flex-direction:column;gap:6px;padding:6px;}
+  body.mv-edit .log-wrap{display:none;}
+  body.mv-log .nl-tabbar,body.mv-log .editor-wrap,body.mv-log .sweep-bar{display:none;}
+  body.mv-log .log-wrap{flex:1;height:auto!important;min-height:0;}
+  .editor-wrap{flex:1;min-height:0;}
+  .editor-wrap .CodeMirror{font-size:16px;line-height:1.5;}
+  .nl-tabbar{padding:4px 4px 0;gap:4px;}
+  .nl-tab{padding:7px 8px 8px;font-size:13px;max-width:150px;}
+  .nl-tab .x{font-size:16px;padding:0 3px;}
+  .nl-tab-add{padding:6px 12px;font-size:16px;}
+  .nl-toolbar{gap:4px;font-size:11px;}
+  #detected-summary{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .nl-toolbar .btn{padding:6px 9px;font-size:12px;}
+  .log-body{font-size:12px;}
+  .log-head{padding:7px 10px;font-size:12px;}
+  .log-head button{padding:5px 10px;font-size:12px;}
+
+  /* sweep — 2줄로 접힘, 입력칸 16px (iOS 포커스 자동확대 방지) */
+  .sweep-bar{flex-wrap:wrap;gap:5px;padding:6px;}
+  .sweep-bar select,.sweep-bar input{height:36px;font-size:16px;}
+  .sweep-bar select{max-width:none;flex:1 1 100px;}
+  .sweep-bar #sw-param{width:auto;flex:1 1 80px;}
+  .sweep-bar #sw-values{flex:1 1 120px;min-width:0;}
+  .sweep-bar #sw-out{width:72px;flex:0 1 72px;}
+  .sweep-bar .btn-sweep{height:36px;padding:0 14px;font-size:14px;}
+
+  /* 결과 화면 */
+  .tabs{flex-shrink:0;}
+  .tab{flex:1 1 0;min-width:0;text-align:center;padding:10px 2px;font-size:13px;white-space:nowrap;}
+  .tab .count{margin-left:3px;padding:1px 5px;}
+  .tab-toolbar{padding:4px 10px;min-height:26px;}
+  .tab-toolbar .status{font-size:12px;}
+  .tab-area{padding:6px;}
+  .tab-pane{inset:6px;overflow-y:auto;}
+  .param-row{gap:6px 8px;padding:6px 8px;margin-bottom:6px;font-size:12px;}
+  .param-row .pl{min-width:0;font-size:13px;}
+  .param-row label{font-size:12px;}
+  .param-row input[type="text"],.param-row input:not([type]){width:76px;height:34px;font-size:16px;}
+  .param-row select{height:34px;font-size:16px;}
+  .param-row .hint{display:none;}
+  /* Noise 경고 배너 — 2줄만 보이고 탭하면 펼침 */
+  .warn-banner{font-size:11px;padding:5px 8px;margin-bottom:6px;line-height:1.45;max-height:39px;overflow:hidden;position:relative;cursor:pointer;flex-shrink:0;}
+  .warn-banner::after{content:'▾ 펼치기';position:absolute;right:0;bottom:0;padding:1px 8px 2px 14px;font-size:11px;font-weight:700;color:#7a3b00;background:linear-gradient(90deg,rgba(255,247,214,0),var(--warn-bg) 30%);}
+  .warn-banner.open{max-height:none;}
+  .warn-banner.open::after{content:'▴ 접기';position:static;display:block;text-align:right;background:none;padding:2px 0 0;}
+  .views-tabs{padding-top:2px;}
+  .view-tab{padding:7px 10px 8px;font-size:13px;}
+  .view-tab .view-close{font-size:16px;padding:0 3px;}
+  .add-view-btn{display:none;}   /* 같은 그래프 복제 — 폰에선 공간만 차지 */
+
+  /* 그래프 뷰: 변수 목록을 차트 위 칩으로 */
+  .views-content{min-height:240px;}
+  .view{flex-direction:column;gap:6px;}
+  .view .view-vars{width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;padding:0 0 6px;border-right:none;border-bottom:1px solid var(--border);max-height:92px;overflow-y:auto;flex-shrink:0;}
+  .view .view-vars-head{font-size:11px;}
+  .view .mag-scale-sel{font-size:14px;padding:3px 4px;}
+  .view .var-list{flex:0 1 auto;flex-direction:row;flex-wrap:wrap;gap:4px;overflow:visible;padding:0;min-height:auto;}
+  .view .var-list label{padding:4px 9px;min-height:30px;border:1px solid var(--border);border-radius:15px;font-size:12px;background:#fff;}
+  .view .var-list label .nm{max-width:130px;}
+  .view .view-allbtns{gap:4px;}
+  .view .view-allbtns button{flex:0 0 auto;padding:5px 10px;font-size:12px;border-radius:15px;}
+  .view .var-filter{flex:1 1 100%;font-size:16px;padding:5px 8px;}
+  .view .view-chart{min-height:200px;}
+  .view .view-chart.bode-stack > .bode-pane{min-height:140px;}
+  .view .view-chart.noise-stack > .noise-chart-wrap{min-height:190px;}
+  .view .chart-zoom-ctrls{opacity:1;top:2px;right:2px;gap:4px;}
+  .view .chart-zoom-ctrls button{width:34px;height:34px;font-size:16px;}
+  .noise-integrate{font-size:12px;gap:6px 10px;padding:6px 8px;}
+  .noise-integrate input[type="text"]{width:86px;height:32px;font-size:16px;}
+  .bottom-bar{padding:6px 10px;gap:6px;}
+  #run-meta{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bottom-bar .spacer{display:none;}
+  .bottom-bar .btn{padding:7px 10px;flex-shrink:0;}
+
+  /* 모달 (갤러리 / 도움말) */
+  .modal{align-items:flex-end;}
+  .modal-body{position:relative;width:100%;max-height:90vh;max-height:90dvh;padding:16px 14px 20px;border-radius:14px 14px 0 0;}
+  .modal-close{top:8px;right:8px;width:44px;height:44px;font-size:28px;}
+  .modal-body h2{padding-right:44px;}
+  .gal-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));}
+  .gal-item{padding:11px 12px;}
+  .gal-title{font-size:13px;}
+  .help-shell{flex-direction:column;gap:10px;}
+  .help-nav{flex:none;flex-direction:row;overflow-x:auto;position:static;border-right:none;border-bottom:1px solid var(--border);padding:0 0 6px;}
+  .help-nav button{white-space:nowrap;flex-shrink:0;padding:8px 10px;}
+  .modal-body pre{font-size:11px;}
+}
 </style>
 </head>
-<body>
+<body class="mv-edit">
 
 <header>
   <div>
@@ -282,13 +409,23 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
   </div>
   <div class="hctrl">
     <span class="badge">BSIM3v3 Level 49</span>
-    <button class="btn btn-rst" onclick="showGallery()">📚 갤러리</button>
-    <button class="btn btn-rst" onclick="exportState()" title="현재 설정을 JSON 파일로 저장">💾 내보내기</button>
-    <button class="btn btn-rst" onclick="document.getElementById('import-file').click()" title="JSON 파일에서 설정 불러오기">📂 불러오기</button>
+    <button class="btn btn-rst" onclick="showGallery()" title="예제 갤러리" aria-label="갤러리">📚<span class="lbl"> 갤러리</span></button>
+    <button class="btn btn-rst" onclick="exportState()" title="현재 설정을 JSON 파일로 저장" aria-label="내보내기">💾<span class="lbl"> 내보내기</span></button>
+    <button class="btn btn-rst" onclick="document.getElementById('import-file').click()" title="JSON 파일에서 설정 불러오기" aria-label="불러오기">📂<span class="lbl"> 불러오기</span></button>
     <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importState(this.files[0]);this.value='';">
-    <button class="btn btn-rst" onclick="showHelp()">❓ 도움말</button>
+    <button class="btn btn-rst" onclick="showHelp()" title="도움말" aria-label="도움말">❓<span class="lbl"> 도움말</span></button>
   </div>
 </header>
+
+<!-- 모바일 전용 화면 전환 바 (PC 에서는 CSS 로 숨김). Run/Stop 버튼은 JS 가 이 안으로 옮김 -->
+<nav class="m-nav" id="m-nav">
+  <div class="m-seg" role="tablist">
+    <button type="button" data-mview="edit" class="active">편집</button>
+    <button type="button" data-mview="result">결과<span class="dot"></span></button>
+    <button type="button" data-mview="log">로그</button>
+  </div>
+  <div class="m-run" id="m-run-slot"></div>
+</nav>
 
 <div class="grid">
 
@@ -340,7 +477,7 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
 
     <div class="tab-toolbar">
       <button id="btn-run" class="btn btn-pri" onclick="runActiveTab()" title="현재 탭 실행 (F5 / Ctrl+Enter)">▶ Run <span id="run-kind">.tran</span><span class="kbd">F5</span></button>
-      <button id="btn-stop" class="btn btn-warn" onclick="stopSim()" disabled title="실행 중지 (Esc)">■ Stop<span class="kbd">Esc</span></button>
+      <button id="btn-stop" class="btn btn-warn" onclick="stopSim()" disabled title="실행 중지 (Esc)" aria-label="Stop">■<span class="lbl"> Stop</span><span class="kbd">Esc</span></button>
       <span id="status" class="status">idle</span>
     </div>
 
@@ -390,7 +527,7 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
       </div>
 
       <div class="tab-pane" id="pane-noise">
-        <div class="warn-banner">
+        <div class="warn-banner" onclick="this.classList.toggle('open')">
           <b>📌 필수:</b> 입력 source에 <code>AC 1</code> 이 있어야 합니다 (예: <code>V1 in 0 DC 5 AC 1</code>). 없으면 ngspice가 <i>"Noise input source has no AC value"</i> 오류를 내고 멈춥니다.<br>
           <b>⚠ 1/f noise 미포함:</b> ETRI 0.5μm 모델에는 NOIA/NOIB/NOIC/KF/AF 파라미터가 없어 <b>thermal noise만</b> 반영됩니다. 저주파 input-referred noise는 실제보다 수십~수백 배 낮게 나옵니다.
         </div>
@@ -1040,6 +1177,14 @@ function loadGalleryExample(idx) {
   // 새 탭에 로드 (현재 작업 보존)
   newNetlistTab(ex.netlist);
   hideGallery();
+  // 모바일: 결과 탭이 화면에 안 보이므로, 예제에 들어 있는 첫 해석으로 미리 맞춰 둔다.
+  // (안 맞추면 Run 시 현재 탭 해석 라인이 netlist 에 자동 추가됨 — 예: AC 예제에 .tran)
+  if (isMobileLayout()) {
+    const ana = detectAnalyses(ex.netlist);
+    const first = ['tran', 'dc', 'ac', 'noise'].find(k => ana[k]);
+    if (first && first !== activeTab) switchTab(first);
+    setMobileView('edit');
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1277,6 +1422,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // 마지막으로: 이전 세션 상태 복원 (있으면 위 default들을 덮어씀)
   loadFromLocalStorage();
+
+  // 좁은 화면이면 모바일 레이아웃 (Run/Stop 위치 이동 + 화면 전환 바)
+  setupMobileLayout();
 });
 
 /* ── 좌/우 패널 폭 splitter ── */
@@ -1332,10 +1480,85 @@ function setupSplitterV() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   모바일 레이아웃 (폭 < 900px)
+   - CSS @media 블록과 짝. 한 화면에 [편집 | 결과 | 로그] 중 하나만 표시.
+   - Run/Stop 버튼은 결과 화면에만 있으면 편집 중에 못 누르므로, 모바일에선
+     상단 전환 바(#m-run-slot)로 DOM 을 옮긴다 (id 그대로라 기존 로직 무변경).
+═══════════════════════════════════════════════════════════════════════ */
+const MOBILE_MQ = window.matchMedia('(max-width: 899px)');
+let mobileView = 'edit';
+
+function isMobileLayout() { return MOBILE_MQ.matches; }
+
+function _resizeActiveCharts() {
+  (chartViews[activeTab] || []).forEach(v => { if (v.chart) v.chart.resize(); if (v.chart2) v.chart2.resize(); });
+}
+
+function setMobileView(v) {
+  if (['edit', 'result', 'log'].indexOf(v) < 0) v = 'edit';
+  mobileView = v;
+  document.body.classList.remove('mv-edit', 'mv-result', 'mv-log');
+  document.body.classList.add('mv-' + v);
+  document.querySelectorAll('#m-nav [data-mview]').forEach(b => {
+    b.classList.toggle('active', b.dataset.mview === v);
+    if (b.dataset.mview === v) b.classList.remove('has-new');
+  });
+  // display:none 에서 돌아온 CodeMirror / 차트는 크기를 다시 잡아야 함
+  if (v === 'edit' && cm) setTimeout(() => cm.refresh(), 0);
+  if (v === 'result') setTimeout(_resizeActiveCharts, 30);
+}
+
+// 결과가 도착했는데 사용자가 결과 화면이 아니면 [결과] 에 점 표시
+function notifyMobileResult() {
+  if (!isMobileLayout() || mobileView === 'result') return;
+  const b = document.querySelector('#m-nav [data-mview="result"]');
+  if (b) b.classList.add('has-new');
+}
+
+function applyLayoutMode() {
+  const mobile = isMobileLayout();
+  const slot = document.getElementById('m-run-slot');
+  const toolbar = document.querySelector('.tab-toolbar');
+  const run = document.getElementById('btn-run');
+  const stop = document.getElementById('btn-stop');
+  const status = document.getElementById('status');
+  if (mobile) {
+    slot.appendChild(run);
+    slot.appendChild(stop);
+  } else {
+    toolbar.insertBefore(run, status);
+    toolbar.insertBefore(stop, status);
+  }
+  if (cm) {
+    cm.setOption('lineWrapping', mobile);   // 폰에서는 가로 스크롤 대신 줄바꿈
+    setTimeout(() => cm.refresh(), 0);
+  }
+  // 이미 그려진 차트의 범례도 맞춤 (Bode 아래 위상 차트는 원래 범례 없음)
+  for (const tab of Object.keys(chartViews)) {
+    for (const v of chartViews[tab]) {
+      if (v.chart) { v.chart.options.plugins.legend.display = !mobile; v.chart.update('none'); }
+    }
+  }
+  setTimeout(_resizeActiveCharts, 30);
+}
+
+function setupMobileLayout() {
+  document.querySelectorAll('#m-nav [data-mview]').forEach(b => {
+    b.addEventListener('click', () => setMobileView(b.dataset.mview));
+  });
+  setMobileView('edit');
+  applyLayoutMode();
+  if (MOBILE_MQ.addEventListener) MOBILE_MQ.addEventListener('change', applyLayoutMode);
+  else if (MOBILE_MQ.addListener) MOBILE_MQ.addListener(applyLayoutMode);   // Safari < 14
+}
+
+/* ════════════════════════════════════════════════════════════════════
    상태 저장/복원 (localStorage + Export/Import)
 ═══════════════════════════════════════════════════════════════════════ */
 const STORAGE_KEY = 'spice-practice-state';
 const STATE_VERSION = 2;
+// 마지막으로 복원된 PC 레이아웃 값 (모바일에서 저장할 때 덮어쓰지 않도록 보존)
+let _deskLayout = {logHeight: null, leftWidth: null};
 
 function serializeState() {
   const v = (id) => {
@@ -1360,8 +1583,9 @@ function serializeState() {
       noise: { out: v('p-noise-out'), src: v('p-noise-src'), type: v('p-noise-type'),
                n: v('p-noise-n'), fstart: v('p-noise-fstart'), fstop: v('p-noise-fstop') }
     },
-    logHeight: log ? log.offsetHeight : 240,
-    leftWidth: leftPanel ? leftPanel.offsetWidth : null,
+    // 모바일 레이아웃에서는 패널 크기가 의미 없으므로 PC 에서 쓰던 값을 그대로 보존
+    logHeight: isMobileLayout() ? _deskLayout.logHeight : (log ? log.offsetHeight : 240),
+    leftWidth: isMobileLayout() ? _deskLayout.leftWidth : (leftPanel ? leftPanel.offsetWidth : null),
     varSelections: varSelections,
     viewFilters: viewFilters
   };
@@ -1425,6 +1649,8 @@ function applyState(state) {
     }
   }
   // 3. log height
+  _deskLayout.logHeight = state.logHeight || null;
+  _deskLayout.leftWidth = state.leftWidth || null;
   if (state.logHeight && state.logHeight > 60) {
     const log = document.getElementById('log-wrap');
     if (log) log.style.height = state.logHeight + 'px';
@@ -2068,6 +2294,8 @@ function runActiveTab() {
 
 function runKind(kind) {
   if (currentWorker) return;
+  // 모바일: 실행 상태·결과·오류 메시지가 결과 화면에 나오므로 바로 전환
+  if (isMobileLayout()) setMobileView('result');
 
   // Run 시 입력란 값을 netlist에 자동 반영 (입력이 모두 차 있을 때만)
   writeAnalysisLineToNetlist(kind, true);
@@ -2280,6 +2508,7 @@ function buildSweepNetlist(src, kind, dev, param, values, outVec) {
 
 function runSweep() {
   if (currentWorker) return;
+  if (isMobileLayout()) setMobileView('result');
   const kind = activeTab;
   if (kind === 'noise') {
     setStatus('noise sweep 미지원', 'err');
@@ -2369,6 +2598,7 @@ function handleSweepResult(kind, values, res) {
   }
   document.getElementById('btn-run').disabled = false;
   document.getElementById('btn-stop').disabled = true;
+  notifyMobileResult();
 }
 
 // refX 그리드에 (xs,ys) 정렬. 길이 같으면 동일 그리드로 보고 그대로, 다르면 선형보간(ascending x)
@@ -2590,6 +2820,7 @@ function handleResult(kind, data, dt) {
 
   document.getElementById('btn-run').disabled = false;
   document.getElementById('btn-stop').disabled = true;
+  notifyMobileResult();
 }
 
 function updateTabCount(name, n, requested) {
@@ -3336,7 +3567,8 @@ function chartOpts(xlab, ylab, xLog, yLog) {
            ticks: { font: { size: 10 }, callback: tickCb } }
     },
     plugins: {
-      legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+      // 모바일에선 차트 위 변수 칩(색 견본 포함)이 범례 역할 → 범례 숨겨 그래프 공간 확보
+      legend: { display: !isMobileLayout(), position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
       tooltip: {
         callbacks: {
           title: (items) => 'x = ' + engFormat(items[0].parsed.x, 5),
@@ -3471,6 +3703,122 @@ function setupChartInteractions(chart) {
   // 더블클릭 → reset zoom
   canvas.addEventListener('dblclick', () => {
     if (chart.resetZoom) chart.resetZoom();
+  });
+
+  setupChartTouch(chart);
+}
+
+/* ── 터치 조작 (폰/태블릿) ──────────────────────────────────────────
+   한 손가락: Chart.js 기본 tooltip (값 읽기) — 손댈 필요 없음
+   두 손가락: 벌리기/오므리기 = 확대/축소, 같이 끌기 = 이동
+   두 번 탭: 원래 범위로
+   chartjs-plugin-zoom 의 터치 지원은 Hammer.js 가 필요해서 직접 구현.
+   log 축(AC/Noise 주파수)은 log 공간에서 계산해야 손가락 위치 기준으로 확대됨. */
+function _axisXf(scale) {
+  const isLog = scale.type === 'logarithmic';
+  return {
+    f:   isLog ? (v => Math.log10(v)) : (v => v),
+    inv: isLog ? (v => Math.pow(10, v)) : (v => v),
+  };
+}
+
+// axisId 축을 (factor 배 확대, centerPx 기준) + (shiftPx 만큼 이동) 한 뒤 원래 범위 안으로 제한
+function _touchAdjustAxis(chart, axisId, factor, centerPx, shiftPx) {
+  const sc = chart.scales[axisId];
+  if (!sc || !chart.zoomScale) return;
+  const {f, inv} = _axisXf(sc);
+  let lo = f(sc.min), hi = f(sc.max);
+  if (!isFinite(lo) || !isFinite(hi) || hi <= lo) return;
+  const horiz = sc.isHorizontal();
+  const len = horiz ? sc.width : sc.height;
+  if (!len) return;
+  // 이동: 손가락이 오른쪽(+x)으로 가면 보이는 범위는 왼쪽으로, 아래(+y)로 가면 위로
+  const dv = (shiftPx / len) * (hi - lo);
+  if (horiz) { lo -= dv; hi -= dv; } else { lo += dv; hi += dv; }
+  // 확대: centerPx 위치의 값을 고정점으로
+  if (factor !== 1) {
+    const frac = horiz ? (centerPx - sc.left) / len : (sc.bottom - centerPx) / len;
+    const c = lo + Math.min(1, Math.max(0, frac)) * (hi - lo);
+    lo = c - (c - lo) / factor;
+    hi = c + (hi - c) / factor;
+  }
+  // 원래 데이터 범위를 넘지 않게 (span 보존하며 밀어넣기)
+  const init = chart.getInitialScaleBounds ? chart.getInitialScaleBounds()[axisId] : null;
+  if (init && init.min != null && init.max != null) {
+    const L = f(init.min), H = f(init.max);
+    if (isFinite(L) && isFinite(H) && H > L) {
+      const span = Math.min(hi - lo, H - L);
+      if (lo < L) { lo = L; hi = L + span; }
+      if (hi > H) { hi = H; lo = H - span; }
+    }
+  }
+  chart.zoomScale(axisId, {min: inv(lo), max: inv(hi)}, 'none');
+}
+
+// Bode 위/아래 그래프 x 축 맞추기
+function _syncBodeSibling(chart) {
+  const sib = chart._bodeSibling;
+  if (!sib) return;
+  // 옵션을 직접 바꾸기 전에 sibling 의 원래 범위를 plugin 에 기록 (안 하면 ⟲/두 번 탭 복원 지점이 틀어짐)
+  if (sib.getInitialScaleBounds) sib.getInitialScaleBounds();
+  sib.options.scales.x.min = chart.scales.x.min;
+  sib.options.scales.x.max = chart.scales.x.max;
+  sib.update('none');
+}
+
+function setupChartTouch(chart) {
+  const canvas = chart.canvas;
+  canvas.style.touchAction = 'none';   // 차트 위 터치로 페이지가 확대/스크롤되지 않게
+  let g = null;          // 두 손가락 제스처 상태
+  let lastTap = 0;
+  const pt = (t) => {
+    const r = canvas.getBoundingClientRect();
+    return {x: t.clientX - r.left, y: t.clientY - r.top};
+  };
+  const snap = (e) => {
+    const a = pt(e.touches[0]), b = pt(e.touches[1]);
+    return {mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2,
+            dx: Math.abs(a.x - b.x), dy: Math.abs(a.y - b.y)};
+  };
+
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      g = snap(e);
+      e.preventDefault();
+    } else if (e.touches.length > 2) {
+      g = null;
+    }
+  }, {passive: false});
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (!g || e.touches.length !== 2) return;
+    e.preventDefault();
+    const n = snap(e);
+    // 손가락 간격이 그 방향으로 충분히 벌어져 있을 때만 그 축을 확대 (가로로 벌리면 x 만)
+    const MIN_SPREAD = 40;
+    const fx = (g.dx > MIN_SPREAD && n.dx > MIN_SPREAD) ? n.dx / g.dx : 1;
+    const fy = (g.dy > MIN_SPREAD && n.dy > MIN_SPREAD) ? n.dy / g.dy : 1;
+    _touchAdjustAxis(chart, 'x', fx, n.mx, n.mx - g.mx);
+    _touchAdjustAxis(chart, 'y', fy, n.my, n.my - g.my);
+    _syncBodeSibling(chart);
+    g = n;
+  }, {passive: false});
+
+  canvas.addEventListener('touchend', (e) => {
+    if (g) {                       // 두 손가락 제스처 종료 — 탭으로 세지 않음
+      if (e.touches.length < 2) { g = null; lastTap = 0; }
+      return;
+    }
+    if (e.touches.length === 0 && e.changedTouches.length === 1) {
+      const now = Date.now();
+      if (now - lastTap < 320) {   // 두 번 탭 → 원래 범위
+        lastTap = 0;
+        if (chart.resetZoom) chart.resetZoom('none');
+        if (chart._bodeSibling && chart._bodeSibling.resetZoom) chart._bodeSibling.resetZoom('none');
+      } else {
+        lastTap = now;
+      }
+    }
   });
 }
 
