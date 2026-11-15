@@ -1050,19 +1050,6 @@ C1 out 0 1u
 .tran 10u 30m
 .end
 `;
-const INTERN_EXP3_HEAD = `* 목표: 이득 40 배(32 dB) · 차단 1 kHz · 출력 ±5 V 안 (허용 ±10 %)
-* 센서: 0.1 V, 내부 저항 10k (Vs · Rs 두 줄은 바꾸지 않는다)
-* .param 줄의 숫자만 바꾼다 → AC 탭 Run (dB, -3 dB) / Tran 탭 Run (±5 V 안?)
-.param R1=1k R2=40k R3=1.6k C1=0.1u
-Vs src 0 DC 0 AC 1 SIN(0 0.1 100)
-Rs src in 10k
-`;
-const INTERN_EXP3_TAIL = `Rf amp out {R3}
-Cf out 0 {C1}
-.ac DEC 50 10 100k
-.tran 20u 30m
-.end
-`;
 
 const GALLERY = [
   {
@@ -1083,34 +1070,32 @@ const GALLERY = [
     netlist: `* ① RC — C 바꾸기 (100 Hz 클럭, R = 1 kΩ)\n` + INTERN_RC_CLOCK
   },
   {
-    cat: 'intern', title: "② 증폭기 — R2 바꾸기", tag: "Tran · Sweep", stars: 1, tab: 'tran',
-    sweep: {dev: 'R2', values: '100k, 40k', out: 'out'},
-    desc: "AI 의 처음 답 100k 와 고친 답 40k — 전원 ±5 V 에서 잘리나?",
-    netlist: `* ② 증폭기 — R2 바꾸기 (입력 0.1 V, 전원 ±5 V)
-* 이상적 op-amp: 출력은 ±5 V 를 넘지 못한다
-Vin in 0 SIN(0 0.1 1k)
-R1 in n 1k
-R2 n out 100k
-B1 out 0 V = max(-5, min(5, -1e5*V(n)))
-.tran 1u 3m
+    cat: 'intern', title: "② RC — 1 kHz 필터", tag: "AC · Sweep", stars: 1, tab: 'ac',
+    sweep: {dev: 'R1', values: '10k, 1.6k', out: 'out'},
+    desc: "C = 0.1 µF, R = 10 kΩ (AI 의 처음 답) · 1.6 kΩ (고친 답) — 어디서 꺾이나?",
+    netlist: `* ② RC — 1 kHz 필터 (C = 0.1 µF)
+* R = 10 kΩ (AI 의 처음 답) · 1.6 kΩ (고친 답) — -3 dB 가 어디인가?
+V1 in 0 AC 1
+R1 in out 10k
+C1 out 0 0.1u
+.ac DEC 50 10 100k
 .end
 `
   },
   {
-    cat: 'intern', title: "③ A 반전 증폭기", tag: "AC · Tran", stars: 2, tab: 'ac',
-    desc: "센서 → 40 배 → 1 kHz → ±5 V — .param 숫자만 바꾼다",
-    netlist: `* ③ A 반전 증폭기 + RC 필터\n` + INTERN_EXP3_HEAD + `Ra in n {R1}
-Rb n amp {R2}
-B1 amp 0 V = max(-5, min(5, -1e5*V(n)))
-` + INTERN_EXP3_TAIL
-  },
-  {
-    cat: 'intern', title: "③ B 비반전 증폭기", tag: "AC · Tran", stars: 2, tab: 'ac',
-    desc: "센서 → 40 배 → 1 kHz → ±5 V — .param 숫자만 바꾼다",
-    netlist: `* ③ B 비반전 증폭기 + RC 필터\n` + INTERN_EXP3_HEAD + `Ra n 0 {R1}
-Rb amp n {R2}
-B1 amp 0 V = max(-5, min(5, 1e5*(V(in)-V(n))))
-` + INTERN_EXP3_TAIL
+    cat: 'intern', title: "③ 센서 + RC 필터", tag: "AC", stars: 2, tab: 'ac',
+    desc: "센서 내부 저항 10 kΩ — 1 kHz 에서 꺾이게 .param 숫자만 바꾼다",
+    netlist: `* ③ 센서 + RC 필터 — 차단 1 kHz 로 (허용 ±10 %)
+* 센서 내부 저항 10k (Vs · Rs 두 줄은 바꾸지 않는다)
+* .param 줄의 숫자만 바꾼다 → AC 탭 Run → out 이 -3 dB 되는 주파수
+.param R1=1.6k C1=0.1u
+Vs src 0 AC 1
+Rs src in 10k
+Rf in out {R1}
+Cf out 0 {C1}
+.ac DEC 50 10 100k
+.end
+`
   },
   {
     cat: 'tutorial', title: "1. 저항 분배기", tag: "DC", stars: 1,
