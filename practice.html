@@ -1039,10 +1039,79 @@ rc1   mid n2 r='2*(rcont/ncont)'
    예제 갤러리 (카테고리별)
 ═══════════════════════════════════════════════════════════════════════ */
 const GALLERY_CATEGORIES = [
+  { id: 'intern', label: '🧑‍🔬 연구실인턴 실습' },
   { id: 'tutorial', label: '📖 SPICE 튜토리얼' },
 ];
 
+// 연구실인턴 실습 (2026-2) — 누르기만 하면 되게: tab = 맞출 결과 탭, run = 바로 실행, sweep = Sweep 칸을 채워 바로 실행
+const INTERN_RC_CLOCK = `V1 in 0 PULSE(0 1 0 1u 1u 5m 10m)
+R1 in out 1k
+C1 out 0 1u
+.tran 10u 30m
+.end
+`;
+const INTERN_EXP3_HEAD = `* 목표: 이득 40 배(32 dB) · 차단 1 kHz · 출력 ±5 V 안 (허용 ±10 %)
+* 센서: 0.1 V, 내부 저항 10k (Vs · Rs 두 줄은 바꾸지 않는다)
+* .param 줄의 숫자만 바꾼다 → AC 탭 Run (dB, -3 dB) / Tran 탭 Run (±5 V 안?)
+.param R1=1k R2=40k R3=1.6k C1=0.1u
+Vs src 0 DC 0 AC 1 SIN(0 0.1 100)
+Rs src in 10k
+`;
+const INTERN_EXP3_TAIL = `Rf amp out {R3}
+Cf out 0 {C1}
+.ac DEC 50 10 100k
+.tran 20u 30m
+.end
+`;
+
 const GALLERY = [
+  {
+    cat: 'intern', title: "0. 준비 운동 — RC 에 클럭", tag: "Tran", stars: 1, tab: 'tran', run: true,
+    desc: "누르면 바로 돈다 — 둥근 네모가 보이면 준비 끝",
+    netlist: `* 준비 운동 — RC 에 클럭 (100 Hz, 0 → 1 V)\n` + INTERN_RC_CLOCK
+  },
+  {
+    cat: 'intern', title: "① RC — R 바꾸기", tag: "Tran · Sweep", stars: 1, tab: 'tran',
+    sweep: {dev: 'R1', values: '100, 1k, 10k', out: 'out'},
+    desc: "R = 100 Ω · 1 kΩ · 10 kΩ (C = 1 µF) — 세 곡선이 바로 뜬다",
+    netlist: `* ① RC — R 바꾸기 (100 Hz 클럭, C = 1 µF)\n` + INTERN_RC_CLOCK
+  },
+  {
+    cat: 'intern', title: "① RC — C 바꾸기", tag: "Tran · Sweep", stars: 1, tab: 'tran',
+    sweep: {dev: 'C1', values: '0.1u, 1u, 10u', out: 'out'},
+    desc: "C = 0.1 · 1 · 10 µF (R = 1 kΩ) — R 바꾸기와 비교",
+    netlist: `* ① RC — C 바꾸기 (100 Hz 클럭, R = 1 kΩ)\n` + INTERN_RC_CLOCK
+  },
+  {
+    cat: 'intern', title: "② 증폭기 — R2 바꾸기", tag: "Tran · Sweep", stars: 1, tab: 'tran',
+    sweep: {dev: 'R2', values: '100k, 40k', out: 'out'},
+    desc: "AI 의 처음 답 100k 와 고친 답 40k — 전원 ±5 V 에서 잘리나?",
+    netlist: `* ② 증폭기 — R2 바꾸기 (입력 0.1 V, 전원 ±5 V)
+* 이상적 op-amp: 출력은 ±5 V 를 넘지 못한다
+Vin in 0 SIN(0 0.1 1k)
+R1 in n 1k
+R2 n out 100k
+B1 out 0 V = max(-5, min(5, -1e5*V(n)))
+.tran 1u 3m
+.end
+`
+  },
+  {
+    cat: 'intern', title: "③ A 반전 증폭기", tag: "AC · Tran", stars: 2, tab: 'ac',
+    desc: "센서 → 40 배 → 1 kHz → ±5 V — .param 숫자만 바꾼다",
+    netlist: `* ③ A 반전 증폭기 + RC 필터\n` + INTERN_EXP3_HEAD + `Ra in n {R1}
+Rb n amp {R2}
+B1 amp 0 V = max(-5, min(5, -1e5*V(n)))
+` + INTERN_EXP3_TAIL
+  },
+  {
+    cat: 'intern', title: "③ B 비반전 증폭기", tag: "AC · Tran", stars: 2, tab: 'ac',
+    desc: "센서 → 40 배 → 1 kHz → ±5 V — .param 숫자만 바꾼다",
+    netlist: `* ③ B 비반전 증폭기 + RC 필터\n` + INTERN_EXP3_HEAD + `Ra n 0 {R1}
+Rb amp n {R2}
+B1 amp 0 V = max(-5, min(5, 1e5*(V(in)-V(n))))
+` + INTERN_EXP3_TAIL
+  },
   {
     cat: 'tutorial', title: "1. 저항 분배기", tag: "DC", stars: 1,
     desc: "V source + R + .dc sweep",
@@ -1177,6 +1246,20 @@ function loadGalleryExample(idx) {
   // 새 탭에 로드 (현재 작업 보존)
   newNetlistTab(ex.netlist);
   hideGallery();
+  // 연구실인턴 실습 예제(tab / run / sweep): PC 에서도 탭을 맞추고, Sweep 칸을 채워 바로 돌린다 — 학생은 누르기만
+  if (ex.tab || ex.run || ex.sweep) {
+    if (ex.tab !== activeTab) switchTab(ex.tab);
+    const sw = ex.sweep || {};
+    populateSweepDevices();
+    document.getElementById('sw-dev').value = sw.dev || '';
+    document.getElementById('sw-param').value = sw.param || '';
+    document.getElementById('sw-values').value = sw.values || '';
+    document.getElementById('sw-out').value = sw.out || '';
+    if (ex.sweep) runSweep();
+    else if (ex.run) runActiveTab();
+    else if (isMobileLayout()) setMobileView('edit');
+    return;
+  }
   // 모바일: 결과 탭이 화면에 안 보이므로, 예제에 들어 있는 첫 해석으로 미리 맞춰 둔다.
   // (안 맞추면 Run 시 현재 탭 해석 라인이 netlist 에 자동 추가됨 — 예: AC 예제에 .tran)
   if (isMobileLayout()) {
