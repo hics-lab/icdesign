@@ -1597,7 +1597,29 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // 좁은 화면이면 모바일 레이아웃 (Run/Stop 위치 이동 + 화면 전환 바)
   setupMobileLayout();
+
+  // 다른 페이지(5T OTA 설계 실습)에서 보낸 netlist: practice.html#import=<base64url(JSON)>
+  importFromHash();
 });
+
+// #import=<base64url(UTF-8 JSON {netlist, tab})> → 새 netlist 탭으로 연다. 읽은 뒤 주소에서 지움.
+function importFromHash() {
+  const m = location.hash.match(/^#import=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  try {
+    const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '==='.slice((b64.length + 3) % 4));
+    const obj = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+    if (!obj || typeof obj.netlist !== 'string' || !obj.netlist.trim() || obj.netlist.length > 200000) return;
+    newNetlistTab(obj.netlist);
+    if (['tran', 'dc', 'ac', 'noise'].includes(obj.tab)) switchTab(obj.tab);
+    if (isMobileLayout()) setMobileView('edit');
+    flushSave();
+  } catch (e) {
+    console.warn('netlist 가져오기 실패:', e);
+  }
+}
 
 /* ── 좌/우 패널 폭 splitter ── */
 function setupSplitterV() {

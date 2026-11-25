@@ -25,7 +25,7 @@ OPAMP_design/                      ← 작업 디렉토리 (repo root 이름과 
 ├── README.md                      간단 소개 + 사용법 + 라이센스
 ├── LICENSE                        MIT — Sejong Univ. HICS Lab (+ 3rd party 고지)
 ├── PDK_차이.md                    ETRI 원본 PDK vs 임베드 모델 차이 (10개 파라미터 제거)
-├── opamp_design.html              ★ 별개 페이지 — 파라미터화된 5T OTA 전용 툴 (건드릴 일 거의 없음)
+├── opamp_design.html              ★ 별개 페이지 — 5T OTA 설계 실습 (손계산 vs SPICE). §11 참고
 ├── etri_mos.lib                   ETRI MOS 모델 텍스트 (참고용, 사이트는 임베드 사용)
 ├── Model_Parameter/               ETRI 원본 PDK 파일 (참고용)
 │   └── 05cmos_model_260210.lib    원본 모델 파일
@@ -345,6 +345,29 @@ ngspice.wasm 의 자체 빌드/공개 출처 의문은 — 이 사이트에서 �
 - "이상한 신호 (boltz, FALSE 등) 가 결과에 나옴" → 5.3 참고. 분석 실패. wrapper 에서 검사 중.
 - "f1 바꿔도 결과 안 변해" → thermal-dominated 면 정상. 자릿수 단위 변경 추천.
 - "탭 이름 바꾸고 싶어" → 더블클릭 (이미 구현됨, `cf015fe`).
+
+---
+
+## 11. opamp_design.html — 5T OTA 설계 실습 (2026-11 재작성)
+
+5T OTA 를 사이징하면서 **손계산(제곱법칙)** 과 **SPICE(ngspice + ETRI BSIM3v3)** 를 나란히 비교하는 페이지. 한 파일, 빌드 없음, Chart.js 4.4.0.
+
+- **손계산 엔진** `handCalc(D, H)`: PMOS 입력형은 전압을 VDD−V 로 뒤집고 n↔p 파라미터를 바꿔 NMOS 입력식으로 푼다 (`buildQ`).
+  균형 동작점은 꼬리 노드 전압 이분법 (`solveBalancedN`). λ(L) = λ@1µm / L, body effect 선택. 파라미터 `FIT` 는
+  ETRI BSIM3 (TT) 를 ngspice 로 피팅한 값 (W=20µm, |VDS|=2.5V, Vov 0.15~0.45V): k'n 115, k'p 38.6 µA/V², VTN 0.72, |VTP| 0.96,
+  λn 0.027, λp 0.053 (L=1µm), γn 0.70 (2φF 0.86), γp 0.50 (2φF 0.78).
+- **SPICE 엔진** `engineNetlist` → `runWorker` → `analyzeSpice`: ngspice 1회 실행에 (1) 개루프 .op + .ac, (2) 단위이득 버퍼 사본
+  DC 스윕(ICMR), (3) 차동 입력 사본 DC 스윕 ±50mV/±1V 를 모두 넣는다 (약 0.1초). 슬라이더 변경 300ms debounce.
+- **`ETRI_MOS` 는 practice.html `ETRI_LIB` 의 MOS 섹션을 그대로 복사한 것** — 모델을 고치면 두 파일을 같이 바꿀 것.
+  코너(TT/SS/FF/SF/FS)는 `CORNERS` 의 TOX/VTH0/XL/XW 를 텍스트 치환 (`modelLib`). 값 출처: Model_Parameter/05cmos_mosfet_corner.lib.
+- 측정 정의: ICMR = 버퍼에서 |Vout−Vin| ≤ 20mV 구간, 선형 출력 범위 = 차동 전달 기울기 ≥ 최대의 50% 구간, PM = 180° + ∠H(0 dB).
+  손계산 ICMR 은 버퍼 비교용으로 입력단 한계 ∩ 출력 한계(M4 포화) ∩ 레일 (`R.icmr`), 교과서식 입력단 한계는 `R.icmrIn`.
+- **설계 도우미** `helperCalc`: Allen-Holberg 순서. ICMR 이 허락하는 최대 Vov 대신 `Vov 상한`(기본 0.3V), 그리고 손계산이
+  전류·gm 을 10~25% 크게 잡으므로 `설계 여유`(기본 25%). 이 두 가지가 없으면 최소폭 소자가 나와 SPICE 에서 목표 미달.
+- **SPICE 실습 페이지로 보내기**: `practice.html#import=<base64url(UTF-8 JSON {netlist, tab})>` — practice.html 의
+  `importFromHash()` 가 새 탭으로 열고 주소에서 지운다.
+- 이전 버전에서 뺀 것: 페이지 안 JS 로 만든 BSIM3 근사 (실제 ngspice 대비 ISS +70%, GBW ×2.8 오차), 공정 파일 가져오기(UI 없던 코드),
+  Vid 스윕의 'V+만 / V−만' 모드. 이전 파일은 git `55a0978` 에 있음.
 
 ---
 

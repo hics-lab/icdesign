@@ -7,6 +7,8 @@ ngspice WASM + ETRI 0.5μm PDK 를 브라우저에서 바로 시뮬레이션 —
 
 **https://hics-lab.github.io/icdesign/practice.html**
 
+5T OTA 설계 실습 (손계산 vs SPICE 비교, 설계 도우미): **https://hics-lab.github.io/icdesign/opamp_design.html**
+
 ## ✨ 특징
 
 - `.tran`, `.dc`, `.ac`, `.noise` 4가지 분석 — 탭별 독립 실행
