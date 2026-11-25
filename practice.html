@@ -392,7 +392,7 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
   .help-shell{flex-direction:column;gap:10px;}
   .help-nav{flex:none;flex-direction:row;overflow-x:auto;position:static;border-right:none;border-bottom:1px solid var(--border);padding:0 0 6px;}
   .help-nav button{white-space:nowrap;flex-shrink:0;padding:8px 10px;}
-  .modal-body pre{font-size:11px;}
+  .modal-body pre{font-size:11px;white-space:pre-wrap;word-break:break-word;}   /* 폰: 옆으로 숨지 않게 줄바꿈 */
 }
 </style>
 </head>
@@ -561,7 +561,7 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
   <div class="modal-body" style="max-width:880px;">
     <button class="modal-close" onclick="hideGallery()">×</button>
     <h2>📚 예제 갤러리</h2>
-    <p class="gal-intro">누르면 editor 에 불러옵니다. 연구실인턴 실습 항목은 누르면 바로 돌아 결과가 뜨고, SPICE 튜토리얼은 기본 소자와 해석 종류(.dc / .tran / .ac / .noise)를 익히는 5가지 회로입니다.</p>
+    <p class="gal-intro">누르면 editor 에 불러옵니다. 연구실인턴 실습 항목은 누르면 바로 돌아 결과가 뜨고, SPICE 튜토리얼은 기본 소자와 해석 종류(.dc / .tran / .ac / .noise)를 익히는 5가지 회로와, 마이칩 PDK 소자(MOS·다이오드·PNP·저항·커패시터)를 모두 쓰는 종합 예제입니다.</p>
     <div id="gallery-content"></div>
   </div>
 </div>
@@ -580,6 +580,7 @@ select.btn{appearance:none;padding-right:22px;background-image:linear-gradient(4
         <button data-tab="ctrl"><span class="nav-icon">⌨️</span>키 / 마우스</button>
         <button data-tab="store"><span class="nav-icon">💾</span>저장 / 갤러리</button>
         <button data-tab="syntax"><span class="nav-icon">📝</span>SPICE 문법</button>
+        <button data-tab="pdk"><span class="nav-icon">🧩</span>PDK 소자</button>
         <button data-tab="ana"><span class="nav-icon">📊</span>분석 명령</button>
         <button data-tab="tips"><span class="nav-icon">⚠️</span>오류 / 팁</button>
         <button data-tab="credits"><span class="nav-icon">📋</span>Credits</button>
@@ -649,7 +650,7 @@ quit
       <!-- ────────── 저장 / 갤러리 / 제한 ────────── -->
       <section class="help-section" data-tab="store">
         <h3>예제 갤러리</h3>
-        <p>헤더의 <b>📚 갤러리</b> 버튼에서 예제를 불러옵니다. <b>연구실인턴 실습</b>(RC 회로 다섯 — 누르면 바로 실행, Sweep 은 미리 채워짐)과 5가지 <b>SPICE 튜토리얼</b>(기본 소자 V/I/R/L/C/M · 해석 종류 .dc / .tran / .ac / .noise)이 있습니다.</p>
+        <p>헤더의 <b>📚 갤러리</b> 버튼에서 예제를 불러옵니다. <b>연구실인턴 실습</b>(RC 회로 다섯 — 누르면 바로 실행, Sweep 은 미리 채워짐)과 <b>SPICE 튜토리얼</b>(기본 소자 V/I/R/L/C/M · 해석 종류 .dc / .tran / .ac / .noise 5가지 + 마이칩 PDK 소자 종합 1가지)이 있습니다.</p>
 
         <h3>자동 저장 / 내보내기 / 불러오기</h3>
         <ul>
@@ -700,6 +701,65 @@ M = 1e-3   U = 1e-6   N = 1e-9    P = 1e-12   F = 1e-15</pre>
 <pre>.lib "/model.lib" MOS         ; 본 페이지에선 ETRI PDK가 /model.lib로 자동 마운트
                                 ; MOS / DIODE / BJT / RES / CAP 섹션 선택 가능
 .include "/model.lib"          ; 라이브러리가 아닌 일반 include</pre>
+        <p>섹션별 소자 이름과 쓰는 법은 <b>🧩 PDK 소자</b> 탭을 보세요.</p>
+      </section>
+
+      <!-- ────────── PDK 소자 (마이칩 ETRI 0.5μm) ────────── -->
+      <!-- 아래 수치는 이 페이지의 ngspice WASM 으로 직접 돌려 확인한 값 (2026-11) -->
+      <section class="help-section" data-tab="pdk">
+        <h3>마이칩 PDK 불러오기</h3>
+        <p>ETRI 0.5μm 공정(마이칩, NSPL) 모델이 <code>/model.lib</code> 에 자동으로 들어 있습니다. 쓰려는 소자의 <b>섹션마다 한 줄씩</b>, 그 소자 줄보다 위에 적습니다.</p>
+<pre>.lib "/model.lib" MOS      ; nmos4, pmos4
+.lib "/model.lib" DIODE    ; pdiode, ndiode
+.lib "/model.lib" BJT      ; pnp10, pnp5, pnp2
+.lib "/model.lib" RES      ; p2res
+.lib "/model.lib" CAP      ; pipcap_i</pre>
+        <div class="callout tip"><b>예제</b> — 모든 소자를 한 번에 쓰는 netlist 는 <b>📚 갤러리 → 6. 마이칩 PDK 소자 종합</b>. 필요한 줄만 복사해서 쓰면 됩니다.</div>
+
+        <h3>MOSFET — nmos4 / pmos4 (BSIM3v3)</h3>
+<pre>M1 d g s b nmos4 W=20u L=1u        ; bulk b = GND
+M2 d g s b pmos4 W=40u L=1u        ; bulk b(Nwell) = VDD 또는 소스
+M3 d g s b nmos4 W=20u L=1u AD=10p AS=10p PD=21u PS=21u M=2</pre>
+        <ul>
+          <li>PDK 레이아웃 기본값은 W=1.6u, L=0.5u. 아날로그 회로는 <b>L ≥ 1u</b> 권장.</li>
+          <li><code>AD/AS/PD/PS</code> 를 안 적으면 드레인·소스 접합 커패시턴스가 0 → 고주파 응답이 실제보다 빠르게 나옴. 대략 AD=AS ≈ W×0.5u, PD=PS ≈ W+1u.</li>
+          <li><code>M=2</code> = 같은 트랜지스터 2개 병렬 (전류 2배).</li>
+        </ul>
+
+        <h3>다이오드 — pdiode / ndiode</h3>
+<pre>D1 anode cathode pdiode W=10u L=10u   ; P+/Nwell: 애노드 P+, 캐소드 Nwell
+D2 0     cathode ndiode W=10u L=10u   ; N+/Pwell: 애노드 = Pwell(기판) → GND</pre>
+        <div class="callout warn"><b>W/L 꼭 적기</b> — 크기를 빼면 면적이 1 m² 로 계산돼 0.6 V 에서 수백 A 가 흐릅니다 (이 페이지에서 683 A). <code>W=10u L=10u</code> 는 <code>area=100p pj=40u</code> 와 같은 결과.</div>
+        <ul>
+          <li>직렬저항이 면적에 반비례합니다: 10×10 µm pdiode 약 16 kΩ, 20×20 µm 약 4 kΩ. 큰 전류에서는 다이오드 전압이 0.7 V 보다 훨씬 커집니다.</li>
+          <li>ndiode 는 기판(GND)이 애노드라 보통 역방향으로 씁니다 (ESD 보호, 접합 커패시터). 10×10 µm, 3 V 역방향 누설 약 3 pA.</li>
+        </ul>
+
+        <h3>BJT — 수직 PNP pnp10 / pnp5 / pnp2</h3>
+<pre>Q1 c b e pnp10          ; 컬렉터 c = 기판(P-sub) → 반드시 GND(0)
+Q2 0 0 e pnp10          ; 다이오드 연결 — 밴드갭 기준전압의 기본 소자
+Q3 0 0 e pnp10 M=8      ; 같은 PNP 8개 병렬 (ΔV<sub>EB</sub> 만들 때)</pre>
+        <ul>
+          <li>숫자 = 에미터 크기: pnp10 = 10×10 µm, pnp5 = 5×5 µm, pnp2 = 2×2 µm. 크기가 정해진 모델이라 <code>area</code> 는 적지 않습니다 (PDK 문서의 Area=1e-10 등은 레이아웃 정보).</li>
+          <li>β 약 7 (BF=7.46). 10 µA 에서 V<sub>EB</sub>: pnp10 0.687 V · pnp5 0.721 V · pnp2 0.754 V. <code>M=8</code> 이면 V<sub>EB</sub> 가 V<sub>T</sub>·ln 8 ≈ 54 mV 낮아짐.</li>
+          <li>NPN 모델은 이 PDK 의 SPICE 파일에 없습니다.</li>
+        </ul>
+
+        <h3>저항 — p2res (POLY2 N+)</h3>
+<pre>X1 a b p2res W=2u L=20u            ; 이름이 R 이 아니라 X 로 시작 (subcircuit)
+X2 a b p2res W=2u L=20u ncont=2    ; ncont = 양 끝 콘택 수</pre>
+        <ul>
+          <li>R = 125 Ω/□ × L/W + 2 × 50 Ω / ncont → W=2u L=20u 이면 <b>1350 Ω</b>. 10 kΩ 은 W=2u L=159u 정도.</li>
+          <li>PDK 기본값 W=2u, L=4u. 온도계수 포함 (77 °C 에서 1350 → 1386 Ω).</li>
+          <li class="muted">원본 모델의 <code>.param dT='(TEMP - tnom)'</code> 는 ngspice 에서 오류가 나서, 같은 식을 ngspice 온도 변수 <code>temper</code> 로 바꿔 넣었습니다 (값 동일).</li>
+        </ul>
+
+        <h3>커패시터 — pipcap_i (POLY1/POLY2)</h3>
+<pre>C1 a b pipcap_i W=20u L=20u       ; 값 대신 W/L 로 크기 지정</pre>
+        <ul>
+          <li>C = 0.5 fF/µm² × W·L + 0.09 fF/µm × 2(W+L) → 20×20 µm 이면 <b>207 fF</b>, W=L=44u 이면 약 1 pF.</li>
+          <li>PDK 기본값 W=L=2.6u.</li>
+        </ul>
       </section>
 
       <!-- ────────── 분석 명령 ────────── -->
@@ -802,7 +862,9 @@ Bin in 0 V = V(vcm) - 0.5*V(vid)</pre>
 // ngspice WASM의 BSIM3v3 구현 호환을 위해 NMOS/PMOS 모델에서 다음 파라미터를 제외:
 //   - HSPICE 전용: RSH, RD, RS, ACM, LDIF, HDIF, N, JS, JSW (junction/area-calc 확장)
 //   - BSIM3v3 표준이지만 ngspice WASM 미지원: FC
-// → 동작점은 RDSW로 동일하게 모델링되며 14개 갤러리 회로 모두 시뮬레이션 검증 완료 (.claude/test_etri.js)
+// → 동작점은 RDSW로 동일하게 모델링되며 갤러리 회로 모두 시뮬레이션 검증 (.claude/test_etri.js)
+// RES(p2res): 원본의 .param dT='(TEMP - tnom)' 가 ngspice 에서 fatal → temper 로 바꿔 식 안에 직접 씀
+//   (값·계수 동일. W=2u L=20u → 1350Ω, 77°C → 1385.9Ω 로 손계산과 일치 확인)
 const ETRI_LIB = `******************************************************************************
 *                                                                                   *
 *       ETRI 0.5um Analog CMOS PROCESS SPICE MODEL      *
@@ -1021,9 +1083,10 @@ const ETRI_LIB = `**************************************************************
 .LIB RES
 .subckt p2res n1 n2
 .param rsh=125 rcont=50 l=1u w=1u ncont=1 tc1=3.915e-4 tc2=3.647e-6 tnom=27
-* Delta Temperature
-.param dT = '(TEMP - tnom)'
-rbody n1 mid r='(rsh*l/w) * (1 + tc1*dT + tc2*dT*dT)'
+* Delta Temperature — 원본: .param dT = '(TEMP - tnom)'
+*   ngspice 는 .param 에서 TEMP 를 모르므로(Formula error → fatal) 소자 식 안에서
+*   ngspice 온도 변수 temper 로 직접 계산. 계수/식은 원본과 동일.
+rbody n1 mid r='(rsh*l/w) * (1 + tc1*(temper-tnom) + tc2*(temper-tnom)*(temper-tnom))'
 rc1   mid n2 r='2*(rcont/ncont)'
 .ends p2res
 .ENDL RES
@@ -1167,6 +1230,47 @@ M1  out in 0 0 nmos4 W=20u L=1u
 .dc Vin 0 5 0.01
 .ac dec 20 1 100Meg
 .noise V(out) Vin DEC 20 1 100Meg
+.end
+`
+  },
+  {
+    cat: 'tutorial', title: "6. 마이칩 PDK 소자 종합", tag: "DC + AC", stars: 2, tab: 'dc',
+    desc: "MOS · 다이오드 · PNP · 저항(p2res) · 커패시터(pipcap) 를 한 netlist 에 — 복사해 쓰는 소자 사용법 (도움말 'PDK 소자' 탭)",
+    netlist: `* 마이칩 PDK 소자 종합 — MOS / DIODE / BJT / RES / CAP 사용법
+* VS 하나(DC 0~5V sweep + AC 1)로 소자별 가지(branch)를 구동한다.
+* 가지 전류는 0V 전류계 Vm1~Vm5 로 측정 → DC 탭 'Current' 그래프
+*   (vs#branch = 전체 합(음수) — 체크 해제하면 가지별 곡선이 크게 보임)
+* 쓰는 소자 섹션마다 .lib 한 줄씩 (소자 줄보다 위에)
+.lib "/model.lib" MOS
+.lib "/model.lib" DIODE
+.lib "/model.lib" BJT
+.lib "/model.lib" RES
+.lib "/model.lib" CAP
+VS  vs 0 DC 2.5 AC 1
+* (1) 저항 p2res — 이름이 X 로 시작(subcircuit). R = 125*L/W + 100/ncont = 1350 ohm
+Vm1 vs a1 DC 0
+X1  a1 0 p2res W=2u L=20u
+* (2) P+/Nwell 다이오드 pdiode — 애노드 P+, 캐소드 Nwell. W/L 꼭 지정
+Vm2 vs a2 DC 0
+R2  a2 dp 1k
+D1  dp 0 pdiode W=10u L=10u
+* (3) N+/Pwell 다이오드 ndiode — 애노드 = Pwell(GND). 여기선 역방향 → 약 3 pA
+D2  0 vs ndiode W=10u L=10u
+* (4) 수직 PNP pnp10 (에미터 10x10um) — 컬렉터 = 기판 이라 GND. 다이오드 연결
+Vm3 vs a3 DC 0
+R3  a3 qe 1k
+Q1  0 0 qe pnp10
+* (5) NMOS — bulk = GND. 다이오드 연결 (게이트 = 드레인)
+Vm4 vs nd DC 0
+M1  nd nd 0 0 nmos4 W=4u L=1u AD=2p AS=2p PD=5u PS=5u
+* (6) PMOS — bulk(Nwell) = 소스 쪽. 다이오드 연결
+Vm5 vs ps DC 0
+M2  0 0 ps ps pmos4 W=8u L=1u AD=4p AS=4p PD=9u PS=9u
+* (7) RC 저역통과 — p2res 12.6k + pipcap 5.04pF → fc 약 2.5 MHz (AC 탭 v(rc))
+X4  vs rc p2res W=2u L=200u
+C1  rc 0 pipcap_i W=100u L=100u
+.dc VS 0 5 0.01
+.ac dec 20 1k 1G
 .end
 `
   },

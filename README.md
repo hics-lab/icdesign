@@ -13,7 +13,8 @@ ngspice WASM + ETRI 0.5μm PDK 를 브라우저에서 바로 시뮬레이션 —
 - 다중 netlist 탭 (한 화면에 여러 회로 동시 관리)
 - AC: Bode plot 자동 표시 (mag / phase 위아래로, x축 동기화)
 - Noise: 대역 적분으로 RMS noise 자동 계산
-- 갤러리 5개 SPICE 튜토리얼 회로
+- 갤러리: SPICE 튜토리얼 6개 (마이칩 PDK 소자 MOS·다이오드·PNP·저항·커패시터 종합 예제 포함) + 연구실인턴 실습 예제
+- 폰 / 태블릿 화면 지원 (편집 · 결과 · 로그 전환, 그래프 두 손가락 확대)
 - 자동 저장, JSON export / import, 상세 도움말
 
 ## 🖥️ 동작

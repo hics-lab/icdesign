@@ -33,7 +33,7 @@ OPAMP_design/                      ← 작업 디렉토리 (repo root 이름과 
 ├── 5T_OTA/                        5T OTA 실습 자료 (사이트와 무관)
 └── .claude/                       테스트 / 헬퍼 스크립트들 (Node.js)
     ├── ngspice_runner.js          ngspice WASM 을 Node 에서 직접 돌리는 헬퍼
-    ├── test_etri.js               갤러리 5개 회로 자동 검증
+    ├── test_etri.js               갤러리 전 회로 자동 검증
     ├── test_*.js / debug_*.js     특정 회로 / 이슈 디버깅용
     └── settings.json              Claude Code 권한 설정
 ```
@@ -75,15 +75,26 @@ const ETRI_LIB = `... 약 230 라인 .MODEL ...`;
 ```
 원본 PDK 에서 **NMOS/PMOS 만 10개 파라미터 제거** (ngspice WASM 이 거부):
 `RSH, RD, RS, ACM, LDIF, HDIF, N, JS, JSW, FC`
-값 변경은 0개. 자세한 내용은 [PDK_차이.md](PDK_차이.md).
+모델 파라미터 값 변경은 0개. 자세한 내용은 [PDK_차이.md](PDK_차이.md).
+
+**RES (`p2res`) 는 식 하나를 고쳤다**: 원본 `.param dT='(TEMP - tnom)'` 은 ngspice 가 `.param` 에서
+`TEMP` 를 몰라 `Formula() error` → fatal. 그래서 `.lib "/model.lib" RES` 를 쓰는 netlist 가 전부 죽었다.
+→ `rbody` 식 안에서 ngspice 온도 변수 `temper` 로 직접 계산 (계수·식 동일, 1350 Ω / 77 °C 1385.9 Ω 손계산 일치).
+
+PDK 소자 사용법(인스턴스 문법·함정)은 도움말 `🧩 PDK 소자` 탭(`data-tab="pdk"`) 과 갤러리 6번에 있다.
+함정 요약: 다이오드는 **W/L 필수**(생략 시 면적 1 m² → 0.6 V 에서 683 A), 다이오드 RS 는 면적에 반비례
+(10×10 µm ≈ 16 kΩ), PNP 컬렉터 = 기판 = GND, 저항은 `X` 로 호출(subckt), 커패시터는 값 대신 W/L.
 
 ### 4.3 갤러리 ([practice.html:869~](practice.html#L869))
-5개 튜토리얼 회로 — `GALLERY = [{cat, title, tag, stars, desc, netlist}, ...]`
-1. 저항 분배기 (.dc)
-2. RC step 응답 (.tran)
-3. RC 주파수 응답 (.ac)
-4. NMOS Id–Vgs (.dc)
-5. NMOS 증폭기 종합 (.dc + .ac + .noise)
+`GALLERY = [{cat, title, tag, stars, desc, netlist, tab?, run?, sweep?}, ...]`, 카테고리 `GALLERY_CATEGORIES`.
+- `intern` (연구실인턴 실습) — `tab`/`run`/`sweep` 프리셋으로 누르면 바로 실행
+- `tutorial` (SPICE 튜토리얼) 6개:
+  1. 저항 분배기 (.dc)
+  2. RC step 응답 (.tran)
+  3. RC 주파수 응답 (.ac)
+  4. NMOS Id–Vgs (.dc)
+  5. NMOS 증폭기 종합 (.dc + .ac + .noise)
+  6. 마이칩 PDK 소자 종합 (.dc + .ac) — MOS/DIODE/BJT/RES/CAP 전 섹션 사용
 
 ### 4.4 전역 상태 ([practice.html:1032~](practice.html#L1032))
 ```js
@@ -274,7 +285,8 @@ Credits / 라이센스 정보는 마지막 탭 (`#help-credits`).
 - `getColor(k)`, `getDash(k)` 사용
 
 ### 6.5 테스트 (Node)
-`.claude/test_etri.js` 를 실행하면 갤러리 5개 회로의 7가지 케이스 자동 검증.
+`.claude/test_etri.js` 를 실행하면 갤러리 전 회로의 모든 해석 케이스 자동 검증 (2026-11 기준 14 케이스).
+GALLERY 가 참조하는 `INTERN_*` 공용 netlist 상수는 스크립트가 자동으로 추출해 넣는다.
 ```powershell
 node .claude/test_etri.js
 ```
