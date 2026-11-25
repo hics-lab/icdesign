@@ -640,7 +640,7 @@ quit
 
         <h3>그래프 마우스 조작</h3>
         <ul>
-          <li><b>왼쪽 드래그</b> — 그래프 패닝 (이동)</li>
+          <li><b>왼쪽 드래그</b> — 그래프 패닝 (이동). 원래 데이터 범위 밖으로는 안 나가므로 먼저 확대한 뒤 사용 (확대 상태면 커서가 손 모양)</li>
           <li><b>오른쪽 드래그</b> — 영역 zoom (드래그한 사각형이 새 표시 영역)</li>
           <li><b>마우스 휠</b> — 커서 위치 중심으로 zoom in/out</li>
           <li><b>더블 클릭</b> — zoom 초기화 (전체 데이터 영역으로 복귀)</li>
@@ -3771,9 +3771,10 @@ function chartOpts(xlab, ylab, xLog, yLog) {
           label: (ctx) => ctx.dataset.label + ' = ' + engFormat(ctx.parsed.y, 5)
         }
       },
-      // chartjs-plugin-zoom: 좌클릭 드래그=pan, 휠=zoom (우클릭 zoom-region은 별도 핸들러)
+      // chartjs-plugin-zoom: 휠=zoom. 좌클릭 드래그 pan(setupChartMousePan)·우클릭 영역 zoom·터치는 직접 구현
+      // (plugin 의 pan 은 Hammer.js 가 필요해서 꺼 둠)
       zoom: {
-        pan: { enabled: true, mode: 'xy' },
+        pan: { enabled: false, mode: 'xy' },
         zoom: { wheel: { enabled: true, speed: 0.1 }, mode: 'xy' },
         limits: { x: {min: 'original', max: 'original'}, y: {min: 'original', max: 'original'} }
       }
@@ -3890,6 +3891,7 @@ function setupChartInteractions(chart) {
     if (chart.zoomScale) {
       chart.zoomScale('x', { min: xMin, max: xMax }, 'none');
       chart.zoomScale('y', { min: yMin, max: yMax }, 'none');
+      _syncBodeSibling(chart);     // Bode 아래/위 그래프도 같은 주파수 범위로
     }
   };
   // mousemove/up은 document 레벨로 (캔버스 밖에서도 추적)
@@ -3901,7 +3903,60 @@ function setupChartInteractions(chart) {
     if (chart.resetZoom) chart.resetZoom();
   });
 
+  setupChartMousePan(chart);
   setupChartTouch(chart);
+}
+
+/* ── 왼쪽 드래그 = 이동 (PC) ─────────────────────────────────────────
+   chartjs-plugin-zoom 의 pan 은 Hammer.js 가 있어야 동작하는데 Hammer 는 터치 제스처까지
+   가로채므로 싣지 않고, 터치 두 손가락 이동과 같은 _touchAdjustAxis 로 직접 구현.
+   원래 데이터 범위 밖으로는 못 나감 → 확대(휠·＋·우클릭 드래그)한 뒤에 움직일 수 있음. */
+function setupChartMousePan(chart) {
+  const canvas = chart.canvas;
+  let p = null;                      // {x, y, dx, dy, moved, raf}
+  const inArea = (e) => {
+    const a = chart.chartArea, r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    return a && x >= a.left && x <= a.right && y >= a.top && y <= a.bottom;
+  };
+  const zoomed = () => (chart.isZoomedOrPanned ? chart.isZoomedOrPanned() : true);
+  const flush = () => {
+    if (!p) return;
+    p.raf = 0;
+    const {dx, dy} = p;
+    p.dx = p.dy = 0;
+    if (dx) _touchAdjustAxis(chart, 'x', 1, 0, dx);
+    if (dy) _touchAdjustAxis(chart, 'y', 1, 0, dy);
+    _syncBodeSibling(chart);
+  };
+  const onMove = (e) => {
+    const mx = e.clientX - p.x, my = e.clientY - p.y;
+    if (!p.moved && Math.abs(mx) + Math.abs(my) < 3) return;   // 단순 클릭은 무시
+    p.moved = true;
+    canvas.style.cursor = 'grabbing';
+    p.dx += mx; p.dy += my;
+    p.x = e.clientX; p.y = e.clientY;
+    if (!p.raf) p.raf = requestAnimationFrame(flush);   // 한 프레임에 한 번만 다시 그림
+  };
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    if (p && p.raf) { cancelAnimationFrame(p.raf); flush(); }
+    p = null;
+    canvas.style.cursor = '';
+  };
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || !inArea(e)) return;     // 범례·축 클릭은 Chart.js 기본 동작 그대로
+    p = {x: e.clientX, y: e.clientY, dx: 0, dy: 0, moved: false, raf: 0};
+    e.preventDefault();                           // 드래그 중 글자 선택 방지
+    // 캔버스 밖으로 나가도 계속 따라가도록 document 에서 받되, 드래그하는 동안만 등록
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  // 확대된 상태면 손 모양 커서로 '끌 수 있음'을 알림
+  canvas.addEventListener('mousemove', (e) => {
+    if (!p) canvas.style.cursor = inArea(e) && zoomed() ? 'grab' : '';
+  });
 }
 
 /* ── 터치 조작 (폰/태블릿) ──────────────────────────────────────────

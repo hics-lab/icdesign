@@ -191,6 +191,9 @@ quit
 - `buildViewChart(tab, view, canvas, canvas2)` — Chart.js 인스턴스
 - `buildViewVarList(tab, view, listEl)` — 우측 변수 체크박스 리스트
 - `varSelections[tab][varName]` 으로 체크 상태 재실행 후에도 유지
+- 그래프 조작: 휠 zoom 은 chartjs-plugin-zoom. **왼쪽 드래그 pan(`setupChartMousePan`)·오른쪽 드래그 영역 zoom·터치(`setupChartTouch`)는 직접 구현**
+  — plugin 의 pan 은 Hammer.js 가 있어야 하는데 Hammer 는 터치까지 가로채므로 싣지 않음 (`pan.enabled:false`).
+  pan/터치는 `_touchAdjustAxis` 로 원래 데이터 범위 안에서만 움직이고, Bode 위/아래는 `_syncBodeSibling` 으로 x 축 맞춤.
 
 ### 4.12 Noise 적분 ([practice.html:2691~](practice.html#L2691))
 - `integrateNoiseBand(rows, varIdx, f1, f2)` — 로그-로그 보간 + 사다리꼴 적분
@@ -368,6 +371,13 @@ ngspice.wasm 의 자체 빌드/공개 출처 의문은 — 이 사이트에서 �
   `importFromHash()` 가 새 탭으로 열고 주소에서 지운다.
 - 이전 버전에서 뺀 것: 페이지 안 JS 로 만든 BSIM3 근사 (실제 ngspice 대비 ISS +70%, GBW ×2.8 오차), 공정 파일 가져오기(UI 없던 코드),
   Vid 스윕의 'V+만 / V−만' 모드. 이전 파일은 git `55a0978` 에 있음.
+- **화면 배치** (2026-11 두 번째 개편): `main.app` 3열 = 왼쪽 `#kpi` 핵심 성능 카드 7개(`.kc`, 큰 값 SPICE / 주황 손계산 / `.t` 상태·목표)
+  | 가운데 회로도 + 설계 변수 | 오른쪽 그래프 탭(`#ctabs`) + 자세히 탭(`#dtabs`: 진단·성능 비교·동작점·수식·손계산 모델).
+  - ≥1100px 이고 높이 ≥600px 이면 한 화면 앱 모드 (body 스크롤 없음, 열마다 따로 스크롤). 높이 ≤800px 이면 슬라이더 2열(`.vcells`)·
+    카드 수식 줄 숨김 — 1280×650(1920 노트북 150% 배율)에서도 스크롤 없이 다 보이게 맞춤. 900~1099px 는 [카드 | 한 열], <900px 는 카드가 위쪽 가로 띠.
+  - 카드 클릭 → `data-g`(그래프 탭)·`data-d`(자세히 탭)·`data-eq`(수식 `.eq[data-k]` 깜빡임). 회로도 소자 클릭 → 동작점 탭.
+    슬라이더 묶음 hover → 회로도 해당 소자 주황 테두리(`ST.hl`). 회로도/동작점 SPICE·손계산 토글은 하나의 상태(`ST.src`, `.src-tg` 두 곳).
+  - 탭·토글 상태는 `ota5t-state-v2` 의 `ui` 에 저장. 회로도 SVG 는 W=380, H=340, 범례는 SVG 안 빈 구석.
 
 ---
 
