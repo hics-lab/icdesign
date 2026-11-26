@@ -1,7 +1,7 @@
 # 마이칩 ETRI 0.5μm PDK vs 시뮬레이션 임베드 모델 비교
 
-본 문서는 [Model_Parameter/05cmos_model_260210.lib](Model_Parameter/05cmos_model_260210.lib)
-(원본, ETRI/모아팹 myChip 배포) 와
+본 문서는 `Model_Parameter/05cmos_model_260210.lib`
+(원본, ETRI/모아팹 myChip 배포, 이 저장소에는 올리지 않음) 와
 [practice.html](practice.html) 의 `ETRI_LIB` 상수 (브라우저 ngspice WASM 시뮬레이션에 마운트되는 모델) 의 차이를 정리한 것이다.
 [opamp_design.html](opamp_design.html) 의 `ETRI_MOS` 는 `ETRI_LIB` 의 MOS 섹션과 같다.
 
@@ -175,7 +175,7 @@ NMOS/PMOS W/L = 10/10 µm, TT. 게이트·소스·드레인을 묶어 채널 전
 
 ## 검증
 
-2026-11 JS/JSW/NJ 를 다시 넣은 뒤: [.claude/test_etri.js](.claude/test_etri.js) 갤러리 14 케이스 **OK: 14, FAIL: 0**.
+2026-11 JS/JSW/NJ 를 다시 넣은 뒤: `.claude/test_etri.js` (로컬 테스트 스크립트) 갤러리 14 케이스 **OK: 14, FAIL: 0**.
 ngspice 경고는 넣기 전과 같다 (Pd/Ps = 0, 소스 DC 값 없음 — 모두 원래 있던 것, unknown parameter 없음).
 
 처음 임베드할 때의 검증 — 갤러리 5개 회로의 7가지 시뮬레이션 케이스(.dc, .tran, .ac, .noise) 를 실제 ngspice WASM 으로 돌려 모두 정상 결과를 확인했다 — **OK: 7, FAIL: 0**.
