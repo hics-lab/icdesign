@@ -24,7 +24,7 @@ OPAMP_design/                      ← 작업 디렉토리 (repo root 이름과 
 ├── ngspice.wasm                   ngspice WebAssembly 바이너리
 ├── README.md                      간단 소개 + 사용법 + 라이센스
 ├── LICENSE                        MIT — Sejong Univ. HICS Lab (+ 3rd party 고지)
-├── PDK_차이.md                    ETRI 원본 PDK vs 임베드 모델 차이 (10개 파라미터 제거)
+├── PDK_차이.md                    ETRI 원본 PDK vs 임베드 모델 차이 (7개 파라미터 제거, 누설 전류 함정)
 ├── opamp_design.html              ★ 별개 페이지 — 5T OTA 설계 실습 (손계산 vs SPICE). §11 참고
 ├── etri_mos.lib                   ETRI MOS 모델 텍스트 (참고용, 사이트는 임베드 사용)
 ├── Model_Parameter/               ETRI 원본 PDK 파일 (참고용)
@@ -73,8 +73,10 @@ Node 에서 ngspice WASM 만 돌려보고 싶을 때 → `.claude/ngspice_runner
 ```js
 const ETRI_LIB = `... 약 230 라인 .MODEL ...`;
 ```
-원본 PDK 에서 **NMOS/PMOS 만 10개 파라미터 제거** (ngspice WASM 이 거부):
-`RSH, RD, RS, ACM, LDIF, HDIF, N, JS, JSW, FC`
+원본 PDK 에서 **NMOS/PMOS 만 7개 파라미터 제거** (HSPICE ACM 전용 + ngspice WASM 이 거부하는 FC):
+`RSH, RD, RS, ACM, LDIF, HDIF, FC`
+S/D 접합 누설 `JS`, `JSW` 는 원본 값 그대로 넣었고, 원본 `N` 은 BSIM3 이름 `NJ` 로 바꿔 넣었다 (2026-11).
+예전처럼 빼 두면 ngspice 기본값 JS = 1e-4 A/m², JSW = 0 이 쓰여 접합 누설이 원본보다 70~140배 크게 나왔다.
 모델 파라미터 값 변경은 0개. 자세한 내용은 [PDK_차이.md](PDK_차이.md).
 
 **RES (`p2res`) 는 식 하나를 고쳤다**: 원본 `.param dT='(TEMP - tnom)'` 은 ngspice 가 `.param` 에서
@@ -231,6 +233,9 @@ SPICE 는 case-insensitive 라서 다음을 **반드시** 알아야 함:
 - **`KF`, `AF` 없음** → flicker (1/f) 노이즈 모델링 안 됨, noise 가 평탄(white-only)
 - **`FC` 없음** → reverse-bias junction cap 만 계산 (forward-bias 영역 보정 X), 일반 동작에는 영향 없음
 - 동작점 / 채널 전류 / 게이트 cap (CGDO/CGSO/CGBO) 은 정확
+- **접합 누설**은 JS/JSW/NJ 를 넣어 원본과 같다. 단 `AD/PD/AS/PS` 를 안 적으면 접합마다 1e-14 A 고정이고,
+  사이트는 `.options` 를 안 주므로 기본 gmin 1e-12 S 가 접합마다 1 pA/V 를 더한다 → fA~nA 급 회로는 둘 다 챙겨야 함
+  (PDK_차이.md "누설 전류 함정")
 
 → 학생이 "왜 노이즈가 평탄해?" / "왜 cap 이 영향이 없어?" 물어보면 위 두 가지 확인:
 1. Cload 명시했는지
@@ -363,6 +368,7 @@ ngspice.wasm 의 자체 빌드/공개 출처 의문은 — 이 사이트에서 �
   DC 스윕(ICMR), (3) 차동 입력 사본 DC 스윕 ±50mV/±1V 를 모두 넣는다 (약 0.1초). 슬라이더 변경 300ms debounce.
 - **`ETRI_MOS` 는 practice.html `ETRI_LIB` 의 MOS 섹션을 그대로 복사한 것** — 모델을 고치면 두 파일을 같이 바꿀 것.
   코너(TT/SS/FF/SF/FS)는 `CORNERS` 의 TOX/VTH0/XL/XW 를 텍스트 치환 (`modelLib`). 값 출처: Model_Parameter/05cmos_mosfet_corner.lib.
+  코너 파일은 JS/JSW 를 바꾸지 않으므로 접합 누설은 모든 코너에서 TT 값.
 - 측정 정의: ICMR = 버퍼에서 |Vout−Vin| ≤ 20mV 구간, 선형 출력 범위 = 차동 전달 기울기 ≥ 최대의 50% 구간, PM = 180° + ∠H(0 dB).
   손계산 ICMR 은 버퍼 비교용으로 입력단 한계 ∩ 출력 한계(M4 포화) ∩ 레일 (`R.icmr`), 교과서식 입력단 한계는 `R.icmrIn`.
 - **설계 도우미** `helperCalc`: Allen-Holberg 순서. ICMR 이 허락하는 최대 Vov 대신 `Vov 상한`(기본 0.3V), 그리고 손계산이

@@ -530,7 +530,7 @@ const $ = id => document.getElementById(id);
 
 /* ════════════════════════════════════════════════════════════════════
    1. 공정 모델
-   ETRI_MOS : practice.html 의 ETRI_LIB 의 MOS 섹션과 동일 (BSIM3v3, NMOS/PMOS 각 102 파라미터)
+   ETRI_MOS : practice.html 의 ETRI_LIB 의 MOS 섹션과 동일 (BSIM3v3, NMOS/PMOS 각 105 파라미터, JS/JSW/NJ 포함)
    CORNERS  : Model_Parameter/05cmos_mosfet_corner.lib 의 코너별 TOX / VTH0 / XL / XW
 ═══════════════════════════════════════════════════════════════════════ */
 const ETRI_MOS = `.LIB MOS : typical MOSFET model                      *
@@ -585,6 +585,7 @@ const ETRI_MOS = `.LIB MOS : typical MOSFET model                      *
 +LLN     = 1              LW      = 0              LWN     = 1.3697465
 +LWL     = 3.210352E-22   CAPMOD  = 2              CGDO    = 3.37325E-10
 +CGSO    = 3.37325E-10    CGBO    = 1.73E-10
++JS      = 3.6051E-7      JSW     = 6.9937E-13     NJ      = 1.013
 +CJ      = 6.82626E-4     PB      = 0.8466723      MJ      = 0.3926956
 +CJSW    = 3.294102E-10   PBSW    = 0.7439323      MJSW    = 0.1781509
 +CJSWG   = 2.851634E-10   PBSWG   = 0.5926519      MJSWG   = 0.3657623
@@ -628,6 +629,7 @@ const ETRI_MOS = `.LIB MOS : typical MOSFET model                      *
 +LLN     = 1              LW      = 0              LWN     = 1.29803
 +LWL     = 2.61288E-22    CAPMOD  = 2              CGDO    = 2.25487E-10
 +CGSO    = 2.25487E-10    CGBO    = 1.73E-10
++JS      = 2.1749E-7      JSW     = 3.1329E-13     NJ      = 0.999
 +CJ      = 7.88187E-4     PB      = 0.896595       MJ      = 0.424322
 +CJSW    = 2.42042E-10    PBSW    = 0.486786       MJSW    = 0.138744
 +CJSWG   = 1.33708E-10    PBSWG   = 0.4            MJSWG   = 0.210204
